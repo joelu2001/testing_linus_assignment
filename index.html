@@ -125,7 +125,7 @@
     function renderPuckList(){
       puckListEl.innerHTML = "";
       if (pucks.length === 0){
-        puckListEl.innerHTML = `<div class="hint">No pucks yet.</div>`;
+        puckListEl.innerHTML = `<div class="hint">Inga puckar än.</div>`;
         return;
       }
       pucks.forEach((p, idx) => {
@@ -137,7 +137,7 @@
             r=${p.radius.toFixed(2)} m=${p.mass.toFixed(2)} cor=${p.cor.toFixed(2)}
             v=(${p.vx.toFixed(2)}, ${p.vy.toFixed(2)})
           </code>
-          <button data-remove="${idx}">Remove</button>
+          <button data-remove="${idx}">Ta bort</button>
         `;
         div.querySelector("button").addEventListener("click", () => {
           pucks.splice(idx, 1);
@@ -154,21 +154,21 @@
 
       const vals = [x,y,radius,mass,cor,vx,vy];
       if (vals.some(v => v === null)){
-        statusEl.textContent = "Please fill all puck fields with valid numbers.";
+        statusEl.textContent = "Fyll i alla puck-fält med giltiga tal.";
         return;
       }
       if (radius <= 0 || mass <= 0){
-        statusEl.textContent = "Radius and mass must be > 0.";
+        statusEl.textContent = "Radie och massa måste vara > 0.";
         return;
       }
       if (cor < 0 || cor > 1){
-        statusEl.textContent = "COR is typically in [0, 1].";
+        statusEl.textContent = "e är i intervallet [0, 1].";
         return;
       }
 
       pucks.push({x,y,radius,mass,cor,vx,vy});
       renderPuckList();
-      statusEl.textContent = "Puck added.";
+      statusEl.textContent = "Puck tillagd.";
     });
 
     function clearAnimation(){
@@ -247,7 +247,7 @@
 
 		if (frameIndex >= frames.length) {
 		rafId = null;
-		statusEl.textContent = "Done.";
+		statusEl.textContent = "Klar.";
 		return;
 		}
 	}
@@ -263,17 +263,17 @@
 
 	frameIndex = 0;
 	lastTs = 0;
-	statusEl.textContent = "Animating…";
+	statusEl.textContent = "Simulerar...";
 
 	rafId = requestAnimationFrame(animate);
 	}
 
 
     async function initPyodideAndPackages(){
-      statusEl.textContent = "Loading Python runtime…";
+      statusEl.textContent = "Laddar Python runtime…";
       pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/" });
 
-      statusEl.textContent = "Loading numpy…";
+      statusEl.textContent = "Laddar numpy…";
       await pyodide.loadPackage(["numpy"]);
 
       // Define simulation code in Python (close to your reference).
@@ -440,13 +440,13 @@ def simulate(pucks_data, friction, T):
     return {"frames": frames, "radii": radii, "dt": dt, "fps": fps}
 `);
 
-      statusEl.textContent = "Ready.";
+      statusEl.textContent = "Redo.";
       simulateBtn.disabled = false;
     }
 
     simulateBtn.addEventListener("click", () => {
       doSimulate().catch(err => {
-        statusEl.textContent = "Error.";
+        statusEl.textContent = "Fel.";
         simHintEl.textContent = err?.message || String(err);
       });
     });
@@ -454,7 +454,7 @@ def simulate(pucks_data, friction, T):
 	async function doSimulate(){
 	if (!pyodide) return;
 	if (pucks.length === 0){
-		statusEl.textContent = "Add at least one puck.";
+		statusEl.textContent = "Lägg till åtminstone en puck.";
 		return;
 	}
 
@@ -462,21 +462,21 @@ def simulate(pucks_data, friction, T):
 	const T = readNum("T");
 
 	if ([friction, T].some(v => v === null)){
-		statusEl.textContent = "Please fill friction/T with valid numbers.";
+		statusEl.textContent = "Fyll i friction/T med giltiga tal.";
 		return;
 	}
 	if (friction < 0){
-		statusEl.textContent = "Friction must be >= 0.";
+		statusEl.textContent = "Friktionen måste vara >= 0.";
 		return;
 	}
 	if (T <= 0){
-		statusEl.textContent = "T must be > 0.";
+		statusEl.textContent = "T måste vara > 0.";
 		return;
 	}
 
 	simulateBtn.disabled = true;
-	statusEl.textContent = "Simulating…";
-	simHintEl.textContent = "Simulating in Python, then animating in JS…";
+	statusEl.textContent = "Simulerar...";
+	simHintEl.textContent = "Simulerar i Python, animerar i JS…";
 
 	clearAnimation();
 
@@ -512,7 +512,7 @@ def simulate(pucks_data, friction, T):
     // init
     renderPuckList();
     initPyodideAndPackages().catch(err => {
-      statusEl.textContent = "Failed to load Python.";
+      statusEl.textContent = "Lyckades inte ladda Python.";
       simHintEl.textContent = err?.message || String(err);
     });
   </script>

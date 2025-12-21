@@ -376,13 +376,23 @@ def simulate_to_gif_base64(pucks_data, friction, T):
         blit=True,
     )
 
-    buf = BytesIO()
-    writer = PillowWriter(fps=fps)  # <-- this determines GIF output
-    anim.save(buf, writer=writer)   # <-- NO format=...
+    import os
+
+    out_path = "/tmp/sim.gif"
+    writer = PillowWriter(fps=fps)
+    anim.save(out_path, writer=writer)
     plt.close(fig)
 
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode("utf-8")
+    with open(out_path, "rb") as f:
+        data = f.read()
+
+    try:
+        os.remove(out_path)
+    except Exception:
+        pass
+
+    return base64.b64encode(data).decode("utf-8")
+
       `);
 
       statusEl.textContent = "Redo.";

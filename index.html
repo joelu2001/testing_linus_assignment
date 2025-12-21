@@ -3,605 +3,497 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Traverse Assignment</title>
-<style>
-  body {margin:0;font-family:system-ui,Arial,sans-serif;background-color:#121212;color:#e0e0e0;}
-  .wrap {display:flex;height:100vh;}
-  .left {width:50%;padding:12px;border-right:1px solid #333;box-sizing:border-box;overflow:auto;background-color:#1e1e1e;}
-  .right {width:50%;padding:12px;box-sizing:border-box;overflow:auto;background-color:#1e1e1e;}
-  .author-note {text-align: center;font-size: 0.8rem;opacity: 0.6;margin-bottom: 6px;}
-  #dataTable {zoom: 0.8;}
+  <title>Puck Simulator</title>
+  <style>
+    body {margin:0;font-family:system-ui,Arial,sans-serif;background:#121212;color:#e0e0e0;}
+    .wrap {display:flex;height:100vh;}
+    .left {width:40%;padding:12px;border-right:1px solid #333;box-sizing:border-box;overflow:auto;background:#1e1e1e;}
+    .right {width:60%;padding:12px;box-sizing:border-box;overflow:auto;background:#1e1e1e;display:flex;flex-direction:column;gap:10px;}
 
-  table {width:100%;}
-  th,td {padding:6px;}
-  input {width:100%;box-sizing:border-box;background-color:#2a2a2a;color:#e0e0e0;border:1px solid #444;}
-  button {padding:8px 12px;background-color:#333;color:#e0e0e0;border:1px solid #555;cursor:pointer;}
-  button:hover {background-color:#444;}
-  .row {display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;align-items:center;}
-  #status {font-size:0.9rem;opacity:0.9;}
-  #plot {border:1px solid #333;background-color:#181818;padding:8px;min-height:360px;display:grid;place-items:center;}
-  #plot img {max-width:100%;height:auto;display:block;}
-  .hint {font-size:0.9rem;opacity:0.9;}
-  
-  #dataTable{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;}
-  #dataTable th,#dataTable td{
-    padding:8px;
-    vertical-align:middle;
-    text-align:center;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    border:1px solid rgba(255,255,255,0.28);
-  }
+    h2,h3{margin:10px 0;}
+    .row {display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:10px 0;}
+    label {font-size:0.85rem;opacity:0.95;display:flex;flex-direction:column;gap:4px;}
+    input {width:140px;box-sizing:border-box;background:#2a2a2a;color:#e0e0e0;border:1px solid #444;padding:8px;border-radius:6px;}
+    input.small{width:110px;}
+    button {padding:10px 14px;background:#333;color:#e0e0e0;border:1px solid #555;cursor:pointer;border-radius:8px;}
+    button:hover {background:#444;}
+    button:disabled{opacity:0.6;cursor:not-allowed;}
 
-  #dataTable th{font-size:0.8rem;}
-  #dataTable td{font-size:0.85rem;}
-  #dataTable tbody tr{height:25px;}
+    #status {font-size:0.9rem;opacity:0.9;}
+    .card {border:1px solid #333;background:#181818;border-radius:10px;padding:10px;margin:10px 0;}
+    .puck-list {display:flex;flex-direction:column;gap:8px;}
+    .puck-item {display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid #333;background:#171717;border-radius:10px;padding:8px;}
+    .puck-item code {font-size:0.85rem;opacity:0.95;}
+    .danger {border-color:#7f1d1d;}
+    .hint {font-size:0.9rem;opacity:0.9;}
 
-  #dataTable input[type="number"]{
-    width:100%;
-    box-sizing:border-box;
-    height:2.2em;
-    line-height:2.2em;
-    text-align:center;}
-	
-  #dataTable td:first-child{font-weight:500;white-space:nowrap;}
-  #dataTable .bg-blue{background:rgba(59,130,246,0.18);background-clip:padding-box;}
-  #dataTable .bg-green{background:rgba(34,197,94,0.18);background-clip:padding-box;}
-  #dataTable td.bg-blue input,#dataTable td.bg-green input{background:transparent;}
-  
-  #dataTable input {text-align: center;}
-  
-  @keyframes flashRed {0% { background-color: rgba(239, 68, 68, 0.25); }100% { background-color: transparent; }}
-  .flash-missing {animation: flashRed 350ms ease-out;}
-</style>
-
+    #simArea {flex:1;border:1px solid #333;background:#111;border-radius:12px;display:grid;place-items:center;overflow:hidden;}
+    canvas {max-width:100%;height:auto;display:block;}
+    .topbar {display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  </style>
 </head>
 <body>
   <div class="wrap">
     <div class="left">
-	<div class="author-note">
-		Created by Joel Utsi
-	</div>
-      <h2>Traverse protocol</h2>
+      <h2>Puck simulation</h2>
 
       <div class="row">
-        <button id="plotBtn" disabled>Do calculation</button>
+        <button id="simulateBtn" disabled>Simulate</button>
         <span id="status">Loading Python…</span>
       </div>
 
-      <p class="hint">
-        Enter values for your observations below, then press "Do calculation".
-      </p>
-		<table id="dataTable">
-		  <thead>
-			<tr>
-			  <th rowspan="2">Punkt</th>
-			  <th class="bg-green">Mätt vinkel (gon)</th>
-			  <th>Fel i vinkel</th>
-			  <th rowspan="2">Sidlängd (m)</th>
-			  <th class="bg-green">ΔN</th>
-			  <th class="bg-green">ΔE</th>
-			  <th class="bg-green">Fel i N</th>
-			</tr>
-			<tr>
-			  <th class="bg-blue">Bäring (gon)</th>
-			  <th></th>
-			  <th class="bg-blue">N</th>
-			  <th class="bg-blue">E</th>
-			  <th class="bg-blue">Fel i E</th>
-			</tr>
-		  </thead>
-		  <tbody>
-			<tr>
-			  <td rowspan="2">20</td>
-			  <td></td>
-			  <td></td>
-			  <td></td>
-			  <td></td>
-			  <td></td>
-			  <td></td>
-			</tr>
-			
-			<tr>
-			  <td></td>
-			  <td></td>
-			  <td rowspan="2"><input type="number" data-in="side_length" data-point="20"></td>
-			  <td class="bg-blue"><input type="number" data-in="N" data-point="20"></td>
-			  <td class="bg-blue"><input type="number" data-in="E" data-point="20"></td>
-			  <td></td>
-			</tr>
-			
-			<tr>
-			  <td rowspan="2">21</td>
-			  <td class="bg-blue"><input type="number" data-in="bearing" data-point="21"></td>
-			  <td></td>
-			  <td class="bg-green"><input class="out" data-out="dN" data-point="21" readonly></td>
-			  <td class="bg-green"><input class="out" data-out="dE" data-point="21" readonly></td>
-			  <td class="bg-green"><input class="out" data-out="wrong_in_N" data-point="21" readonly></td>
-			</tr>
-			
-			<tr>
-			  <td class="bg-green"><input type="number" data-in="measured_angle" data-point="21"></td>
-			  <td><input class="out" data-out="wrong_in_angle" data-point="21" readonly></td>
-			  <td rowspan="2"><input type="number" data-in="side_length" data-point="21"></td>
-			  <td class="bg-blue"><input class="out" data-out="N" data-point="21" readonly></td>
-			  <td class="bg-blue"><input class="out" data-out="E" data-point="21" readonly></td>
-			  <td class="bg-blue"><input class="out" data-out="wrong_in_E" data-point="21" readonly></td>
-			</tr>
-			
-			<tr>
-			  <td rowspan="2">22</td>
-			  <td class="bg-blue"><input class="out" data-out="bearing" data-point="22" readonly></td>
-			  <td></td>
-			  <td class="bg-green"><input class="out" data-out="dN" data-point="22" readonly></td>
-			  <td class="bg-green"><input class="out" data-out="dE" data-point="22" readonly></td>
-			  <td class="bg-green"><input class="out" data-out="wrong_in_N" data-point="22" readonly></td>
-			</tr>
+      <div class="card">
+        <h3>Environment</h3>
+        <div class="row">
+          <label>
+            Friction (μ)
+            <input id="friction" type="number" step="0.01" value="0.10" />
+          </label>
 
-			<tr>
-			  <td class="bg-green"><input type="number" data-in="measured_angle" data-point="22"></td>
-			  <td><input class="out" data-out="wrong_in_angle" data-point="22" readonly></td>
-			  <td rowspan="2"><input type="number" data-in="side_length" data-point="22"></td>
-			  <td class="bg-blue"><input class="out" data-out="N" data-point="22" readonly></td>
-			  <td class="bg-blue"><input class="out" data-out="E" data-point="22" readonly></td>
-			  <td class="bg-blue"><input class="out" data-out="wrong_in_E" data-point="22" readonly></td>
-			</tr>
-			
-			<tr>
-			  <td rowspan="2">23</td>
-			  <td class="bg-blue"><input class="out" data-out="bearing" data-point="23" readonly></td>
-			  <td></td>
-			  <td class="bg-green"><input class="out" data-out="dN" data-point="23" readonly></td>
-			  <td class="bg-green"><input class="out" data-out="dE" data-point="23" readonly></td>
-			  <td class="bg-green"><input class="out" data-out="wrong_in_N" data-point="23" readonly></td>
-			</tr>
+          <label>
+            Total time (s)
+            <input id="T" type="number" step="0.1" value="5.0" />
+          </label>
 
-			<tr>
-			  <td class="bg-green"><input type="number" data-in="measured_angle" data-point="23"></td>
-			  <td><input class="out" data-out="wrong_in_angle" data-point="23" readonly></td>
-			  <td rowspan="2"><input type="number" data-in="side_length" data-point="23"></td>
-			  <td class="bg-blue"><input class="out" data-out="N" data-point="23" readonly></td>
-			  <td class="bg-blue"><input class="out" data-out="E" data-point="23" readonly></td>
-			  <td class="bg-blue"><input class="out" data-out="wrong_in_E" data-point="23" readonly></td>
-			</tr>
-			
-			<tr>
-			  <td rowspan="2">24</td>
-			  <td class="bg-blue"><input class="out" data-out="bearing" data-point="24" readonly></td>
-			  <td></td>
-			  <td class="bg-green"><input class="out" data-out="dN" data-point="24" readonly></td>
-			  <td class="bg-green"><input class="out" data-out="dE" data-point="24" readonly></td>
-			  <td class="bg-green"><input class="out" data-out="wrong_in_N" data-point="24" readonly></td>
-			</tr>
+          <label>
+            dt (s)
+            <input id="dt" type="number" step="0.001" value="0.002" />
+          </label>
 
-			<tr>
-			  <td class="bg-green"><input type="number" data-in="measured_angle" data-point="24"></td>
-			  <td><input class="out" data-out="wrong_in_angle" data-point="24" readonly></td>
-			  <td rowspan="2"><input type="number" data-in="side_length" data-point="24"></td>
-			  <td class="bg-blue"><input class="out" data-out="N" data-point="24" readonly></td>
-			  <td class="bg-blue"><input class="out" data-out="E" data-point="24" readonly></td>
-			  <td class="bg-blue"><input class="out" data-out="wrong_in_E" data-point="24" readonly></td>
-			</tr>
-			
-			<tr>
-			  <td rowspan="2">20</td>
-			  <td class="bg-blue"><input class="out" data-out="bearing" data-point="20" readonly></td>
-			  <td></td>
-			  <td class="bg-green"><input class="out" data-out="dN" data-point="20" readonly></td>
-			  <td class="bg-green"><input class="out" data-out="dE" data-point="20" readonly></td>
-			  <td class="bg-green"><input class="out" data-out="wrong_in_N" data-point="20" readonly></td>
-			</tr>
+          <label>
+            FPS (frames/s)
+            <input id="fps" type="number" step="1" value="60" />
+          </label>
+        </div>
+        <div class="hint">Tip: keep dt small for stable collisions; FPS controls how many frames we render.</div>
+      </div>
 
-			<tr>
-			  <td class="bg-green"><input type="number" data-in="measured_angle" data-point="20"></td>
-			  <td><input class="out" data-out="wrong_in_angle" data-point="20" readonly></td>
-			  <td></td>
-			  <td></td>
-			  <td></td>
-			  <td class="bg-blue"><input class="out" data-out="wrong_in_E" data-point="20" readonly></td>
-			</tr>
-		  </tbody>
-		  <thead>
-			<tr>
-			  <th>f<sub>β</sub></th>
-			  <th>f<sub>N</sub></th>
-			  <th>f<sub>E</sub></th>
-			  <th>f<sub>r</sub></th>
-			  <th>Σ</th>
-			</tr>
-		  </thead>
-		  <tbody>
-			  <tr>
-				  <td><input class="out" data-out="f_beta" readonly></td>
-				  <td><input class="out" data-out="fN" readonly></td>
-				  <td><input class="out" data-out="fE" readonly></td>
-				  <td><input class="out" data-out="fR" readonly></td>
-				  <td><input class="out" data-out="total_length" readonly></td>
-				</tr>
-		  </tbody>
-		</table>
+      <div class="card">
+        <h3>Add puck</h3>
+        <div class="row">
+          <label>pos x <input id="px" class="small" type="number" step="0.1" value="-1.0"></label>
+          <label>pos y <input id="py" class="small" type="number" step="0.1" value="-1.0"></label>
+          <label>radius <input id="pr" class="small" type="number" step="0.01" value="0.15"></label>
+          <label>mass <input id="pm" class="small" type="number" step="0.01" value="1.0"></label>
+          <label>cor <input id="pcor" class="small" type="number" step="0.01" value="0.30"></label>
+          <label>vx <input id="pvx" class="small" type="number" step="0.1" value="2.0"></label>
+          <label>vy <input id="pvy" class="small" type="number" step="0.1" value="2.0"></label>
+
+          <button id="addPuckBtn">New puck</button>
+        </div>
+        <div class="hint">Adds a puck with position, radius, mass, COR, and initial velocity.</div>
+
+        <h3 style="margin-top:12px;">Pucks</h3>
+        <div id="puckList" class="puck-list"></div>
+      </div>
     </div>
 
     <div class="right">
-      <h2>Closed traverse</h2>
-      <div id="plot"><div class="hint">Fill in the traverse protocol to the left.</div></div>
+      <div class="topbar">
+        <h2 style="margin:0;">Animation</h2>
+        <div class="hint" id="simHint">Add pucks and press Simulate.</div>
+      </div>
+
+      <div id="simArea">
+        <canvas id="canvas" width="900" height="600"></canvas>
+      </div>
     </div>
   </div>
 
-  <!-- Pyodide (official CDN, pinned version) -->
+  <!-- Pyodide -->
   <script src="https://cdn.jsdelivr.net/pyodide/v0.29.0/full/pyodide.js"></script>
 
   <script>
-    const tbody = document.querySelector("#dataTable tbody");
-    const plotBtn = document.getElementById("plotBtn");
     const statusEl = document.getElementById("status");
-    const plotEl = document.getElementById("plot");
+    const simulateBtn = document.getElementById("simulateBtn");
+    const addPuckBtn = document.getElementById("addPuckBtn");
+    const puckListEl = document.getElementById("puckList");
+    const simHintEl = document.getElementById("simHint");
+
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
 
     let pyodide = null;
+    let pucks = []; // JS list of puck definitions
 
-    async function initPyodideAndPackages() {
-      statusEl.textContent = "Loading Python runtime…";
-      pyodide = await loadPyodide({
-        indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/"
+    // Animation state
+    let frames = null; // [frame][puck] => [x,y]
+    let radii = null;  // [puck] => radius
+    let frameIndex = 0;
+    let rafId = null;
+    let worldBounds = {xmin:-2, xmax:2, ymin:-2, ymax:2}; // simple default
+
+    function isFiniteNumber(x){ return Number.isFinite(x); }
+    function readNum(id){
+      const v = Number(document.getElementById(id).value);
+      return isFiniteNumber(v) ? v : null;
+    }
+
+    function renderPuckList(){
+      puckListEl.innerHTML = "";
+      if (pucks.length === 0){
+        puckListEl.innerHTML = `<div class="hint">No pucks yet.</div>`;
+        return;
+      }
+      pucks.forEach((p, idx) => {
+        const div = document.createElement("div");
+        div.className = "puck-item";
+        div.innerHTML = `
+          <code>
+            #${idx+1} pos=(${p.x.toFixed(2)}, ${p.y.toFixed(2)})
+            r=${p.radius.toFixed(2)} m=${p.mass.toFixed(2)} cor=${p.cor.toFixed(2)}
+            v=(${p.vx.toFixed(2)}, ${p.vy.toFixed(2)})
+          </code>
+          <button data-remove="${idx}">Remove</button>
+        `;
+        div.querySelector("button").addEventListener("click", () => {
+          pucks.splice(idx, 1);
+          renderPuckList();
+        });
+        puckListEl.appendChild(div);
       });
+    }
 
-      statusEl.textContent = "Loading matplotlib + numpy…";
-      await pyodide.loadPackage(["numpy", "matplotlib"]);
+    addPuckBtn.addEventListener("click", () => {
+      const x = readNum("px"), y = readNum("py"), radius = readNum("pr"),
+            mass = readNum("pm"), cor = readNum("pcor"),
+            vx = readNum("pvx"), vy = readNum("pvy");
 
-      // Define a Python helper that returns a base64 PNG string.
+      const vals = [x,y,radius,mass,cor,vx,vy];
+      if (vals.some(v => v === null)){
+        statusEl.textContent = "Please fill all puck fields with valid numbers.";
+        return;
+      }
+      if (radius <= 0 || mass <= 0){
+        statusEl.textContent = "Radius and mass must be > 0.";
+        return;
+      }
+      if (cor < 0 || cor > 1){
+        statusEl.textContent = "COR is typically in [0, 1].";
+        return;
+      }
+
+      pucks.push({x,y,radius,mass,cor,vx,vy});
+      renderPuckList();
+      statusEl.textContent = "Puck added.";
+    });
+
+    function clearAnimation(){
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      frames = null;
+      radii = null;
+      frameIndex = 0;
+      draw(); // draw empty
+    }
+
+    function worldToCanvas(x, y){
+      const {xmin,xmax,ymin,ymax} = worldBounds;
+      const w = canvas.width, h = canvas.height;
+      const sx = (x - xmin) / (xmax - xmin) * w;
+      const sy = h - (y - ymin) / (ymax - ymin) * h;
+      return [sx, sy];
+    }
+
+    function radiusToCanvas(r){
+      const {xmin,xmax} = worldBounds;
+      const w = canvas.width;
+      return r / (xmax - xmin) * w;
+    }
+
+    function draw(){
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+
+      // background grid (simple)
+      ctx.globalAlpha = 0.18;
+      ctx.beginPath();
+      const step = 50;
+      for (let x=0; x<=canvas.width; x+=step){ ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); }
+      for (let y=0; y<=canvas.height; y+=step){ ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); }
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      if (!frames || frameIndex >= frames.length) return;
+
+      const frame = frames[frameIndex];
+      for (let i=0; i<frame.length; i++){
+        const [x,y] = frame[i];
+        const [cx,cy] = worldToCanvas(x,y);
+        const rr = radiusToCanvas(radii[i]);
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr, 0, Math.PI*2);
+        ctx.strokeStyle = "#e0e0e0";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // small center dot
+        ctx.beginPath();
+        ctx.arc(cx, cy, 2.5, 0, Math.PI*2);
+        ctx.fillStyle = "#e0e0e0";
+        ctx.fill();
+      }
+    }
+
+    function animate(){
+      draw();
+      frameIndex++;
+      if (frames && frameIndex < frames.length){
+        rafId = requestAnimationFrame(animate);
+      } else {
+        rafId = null;
+        statusEl.textContent = "Done.";
+      }
+    }
+
+    async function initPyodideAndPackages(){
+      statusEl.textContent = "Loading Python runtime…";
+      pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/" });
+
+      statusEl.textContent = "Loading numpy…";
+      await pyodide.loadPackage(["numpy"]);
+
+      // Define simulation code in Python (close to your reference).
       pyodide.runPython(`
-import base64
-from io import BytesIO
-import matplotlib
-matplotlib.use("Agg")  # render offscreen to PNG
 import math
-import matplotlib.pyplot as plt
 
-def plot_xy_to_base64(xs, ys):
-    fig, ax = plt.subplots(figsize=(5, 5), dpi=400)
+class Puck:
+    def __init__(self, pos, radius, mass, cor):
+        self.pos = pos
+        self.radius = radius
+        self.mass = mass
+        self.cor = cor
+        self.velocity = (0.0, 0.0)
 
-    ax.plot(xs, ys, marker="o", linestyle="-")
+    def set_position(self, pos):
+        self.pos = pos
 
-    # Label points 20–24 (ignore closing point if present)
-    labels = ["20", "21", "22", "23", "24"]
-    n = min(5, len(xs), len(ys))
+    def set_velocity(self, vx, vy):
+        self.velocity = (float(vx), float(vy))
 
-    for i in range(n):
-        ax.annotate(
-            labels[i],
-            (xs[i], ys[i]),
-            textcoords="offset points",
-            xytext=(5, 5),
-            ha="left",
-            va="bottom",
-            fontsize=9,
-        )
+    def get_velocity(self):
+        return self.velocity
 
-    ax.set_xlabel("E")
-    ax.set_ylabel("N")
-    ax.set_aspect("equal", adjustable="box")
+    def get_pos(self):
+        return self.pos
 
-    # Make sure origin is in view and sits toward lower-left
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
+    def get_radius(self):
+        return self.radius
 
-    span = max(max_x - min_x, max_y - min_y, 1.0)
-    pad = 0.10 * span
+    def get_mass(self):
+        return self.mass
 
-    ax.set_xlim(min(0.0, min_x) - pad, max_x + pad)
-    ax.set_ylim(min(0.0, min_y) - pad, max_y + pad)
+    def get_cor(self):
+        return self.cor
 
-    ax.grid(True, which="major")
-    ax.minorticks_on()
-    ax.grid(True, which="minor", alpha=0.3)
+class Room:
+    def __init__(self, friction):
+        self.friction = float(friction)
+        self.pucks = []
 
-    buf = BytesIO()
-    fig.tight_layout()
-    fig.savefig(buf, format="png")
-    plt.close(fig)
+    def add(self, puck):
+        self.pucks.append(puck)
 
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode("utf-8")
+    def update_step(self, dt):
+        length = len(self.pucks)
 
-POINTS = ["20", "21", "22", "23", "24"]
+        # collisions
+        for i in range(length):
+            for j in range(i + 1, length):
+                p1, p2 = self.pucks[i], self.pucks[j]
+                if self.collision(p1, p2):
+                    v1_after, v2_after = self.collision_velocities(p1, p2)
+                    p1.set_velocity(*v1_after)
+                    p2.set_velocity(*v2_after)
 
-def gon_to_rad(g):
-    return g * math.pi / 200.0
+                    # separate overlap
+                    n = self.collision_normal(p1, p2)
+                    d = self.distance(p1, p2)
+                    collision_radius = p1.get_radius() + p2.get_radius()
+                    dist = math.sqrt(self._prod(d, d))
+                    extra_margin = (collision_radius - dist) if dist > 0 else collision_radius
+                    p1.set_position(self._sum(p1.get_pos(), self._mult_scalar(extra_margin, n)))
+                    p2.set_position(self._sum(p2.get_pos(), self._mult_scalar(-extra_margin, n)))
 
-def _get(inputs, point, key):
-    v = (inputs.get(point, {}) or {}).get(key, None)
-    return float(v) if v is not None else None
+        # integrate
+        for puck in self.pucks:
+            v = puck.get_velocity()
+            pos = puck.get_pos()
 
-def adjust_angles(angles):
-    β = [a[3] for a in angles]
-    fβ = 400 - sum(β)
-    dβ = fβ / 5
-    return [βi + dβ + 200 for βi in β]
+            new_pos = self._sum(pos, self._mult_scalar(dt, v))
+            a = self._deceleration(puck)
+            new_v = self._diff(v, self._mult_scalar(dt, a))
 
-def compute_bearings(phi_12, adjusted_angles):
-    phi = [0.0] * 5
-    phi[0] = phi_12
-    for i in range(1, 5):
-        phi[i] = (phi[i - 1] + adjusted_angles[i - 1] - 200.0) % 400.0
-    return phi
+            puck.set_position(new_pos)
+            puck.set_velocity(*new_v)
 
-def compute_increments(lengths, bearings):
-    dN, dE = [], []
-    for i in range(5):
-        L = lengths[i]  # now a float
-        phi = gon_to_rad(bearings[i])
-        dN.append(L * math.cos(phi))
-        dE.append(L * math.sin(phi))
-    return dN, dE
+    def collision_velocities(self, p1, p2):
+        m1, m2 = p1.get_mass(), p2.get_mass()
+        e = max(p1.get_cor(), p2.get_cor())
+        n = self.collision_normal(p1, p2)
+        v1, v2 = p1.get_velocity(), p2.get_velocity()
+        return self._collision_equations(m1, m2, e, n, v1, v2)
 
-def compute_coordinate_errors(dN, dE):
-    fN = -sum(dN)
-    fE = -sum(dE)
-    fR = math.sqrt(fN**2 + fE**2)
-    return fN, fE, fR
+    def _collision_equations(self, m1, m2, e, n, v1, v2):
+        # same formula as your reference
+        rel = self._diff(v1, v2)
+        k = self._prod(rel, n)
+        v1_after = self._diff(v1, self._mult_scalar((1 + e) * m2 / (m1 + m2) * k, n))
+        v2_after = self._sum(v2, self._mult_scalar((1 + e) * m1 / (m1 + m2) * k, n))
+        return v1_after, v2_after
 
-def compute_Bowditch(fN, fE, lengths):
-    total_length = sum(lengths)
-    cor_N = [L * fN / total_length for L in lengths]
-    cor_E = [L * fE / total_length for L in lengths]
-    return cor_N, cor_E, total_length
+    def collision_normal(self, p1, p2):
+        d = self.distance(p1, p2)
+        norm = math.sqrt(self._prod(d, d))
+        return self._div(d, norm)
 
-def compute_coordinates(first_N, first_E, dN, dE, cor_N, cor_E):
-    coordinates = []
-    for i in range(5):
-        N = first_N + sum(dN[:i]) + sum(cor_N[:i])
-        E = first_E + sum(dE[:i]) + sum(cor_E[:i])
-        coordinates.append((N, E))
-    return coordinates
+    def distance(self, p1, p2):
+        return self._diff(p1.get_pos(), p2.get_pos())
 
-def compute(inputs):
-    first_N = _get(inputs, "20", "N")
-    first_E = _get(inputs, "20", "E")
-    phi_12 = _get(inputs, "21", "bearing")
+    def collision(self, p1, p2):
+        d = self.distance(p1, p2)
+        r = p1.get_radius() + p2.get_radius()
+        return self._prod(d, d) < r * r
 
-    ANGLE_POINTS = ["21", "22", "23", "24", "20"]
-    LEG_POINTS = ["20", "21", "22", "23", "24"]
+    def _deceleration(self, puck):
+        # friction deceleration magnitude mu*g, opposite velocity direction
+        g = 9.82
+        vx, vy = puck.get_velocity()
+        speed = math.sqrt(vx*vx + vy*vy)
+        if speed == 0.0:
+            return (0.0, 0.0)
+        dir_v = (vx / speed, vy / speed)
+        return self._mult_scalar(self.friction * g, dir_v)
 
-    beta_measured = [_get(inputs, p, "measured_angle") for p in ANGLE_POINTS]
-    leg_lengths = [_get(inputs, p, "side_length") for p in LEG_POINTS]
+    def _prod(self, a, b):
+        return a[0]*b[0] + a[1]*b[1]
+    def _diff(self, a, b):
+        return (a[0]-b[0], a[1]-b[1])
+    def _sum(self, a, b):
+        return (a[0]+b[0], a[1]+b[1])
+    def _mult_scalar(self, s, v):
+        return (s*v[0], s*v[1])
+    def _div(self, v, s):
+        if s == 0.0:
+            return (0.0, 0.0)
+        return (v[0]/s, v[1]/s)
 
-    if any(v is None for v in [first_N, first_E, phi_12] + beta_measured + leg_lengths):
-        return {}
+def simulate(pucks_data, friction, dt, T, fps):
+    dt = float(dt)
+    T = float(T)
+    fps = int(fps)
 
-    angles = [[0.0, 0.0, 0.0, b] for b in beta_measured]
-    lengths = leg_lengths
+    room = Room(friction)
+    pucks = []
 
-    adjusted_angles = adjust_angles(angles)
+    for p in pucks_data:
+        puck = Puck((float(p["x"]), float(p["y"])), float(p["radius"]), float(p["mass"]), float(p["cor"]))
+        puck.set_velocity(float(p["vx"]), float(p["vy"]))
+        room.add(puck)
+        pucks.append(puck)
 
-    wrong_in_angle_by_point = {
-        p: adjusted_angles[i] - beta_measured[i]
-        for i, p in enumerate(ANGLE_POINTS)
-    }
+    # number of integration steps
+    steps = int(max(1, math.ceil(T / dt)))
 
-    f_beta = 0
-    for i in wrong_in_angle_by_point.values():
-        f_beta += i
+    # record every k steps to achieve roughly fps
+    # target frames = T*fps, so k ≈ steps/frames
+    target_frames = max(1, int(T * fps))
+    k = max(1, steps // target_frames)
 
-    bearings = compute_bearings(phi_12, adjusted_angles)
-    dN, dE = compute_increments(lengths, bearings)
+    frames = []
+    for s in range(steps + 1):
+        if s % k == 0:
+            frames.append([list(p.get_pos()) for p in pucks])
+        room.update_step(dt)
 
-    fN, fE, fR = compute_coordinate_errors(dN, dE)
-    cor_N, cor_E, total_L = compute_Bowditch(fN, fE, lengths)
-    coords = compute_coordinates(first_N, first_E, dN, dE, cor_N, cor_E)
-
-    bearing_incoming = {
-        "21": bearings[0],
-        "22": bearings[1],
-        "23": bearings[2],
-        "24": bearings[3],
-        "20": bearings[4],
-    }
-
-    dN_incoming = {
-        "21": dN[0],
-        "22": dN[1],
-        "23": dN[2],
-        "24": dN[3],
-        "20": dN[4],
-    }
-
-    dE_incoming = {
-        "21": dE[0],
-        "22": dE[1],
-        "23": dE[2],
-        "24": dE[3],
-        "20": dE[4],
-    }
-
-    corN_incoming = {
-        "21": cor_N[0],
-        "22": cor_N[1],
-        "23": cor_N[2],
-        "24": cor_N[3],
-        "20": cor_N[4],
-    }
-
-    corE_incoming = {
-        "21": cor_E[0],
-        "22": cor_E[1],
-        "23": cor_E[2],
-        "24": cor_E[3],
-        "20": cor_E[4],
-    }
-
-    coord_by_point = {
-        "20": (coords[0][0], coords[0][1]),
-        "21": (coords[1][0], coords[1][1]),
-        "22": (coords[2][0], coords[2][1]),
-        "23": (coords[3][0], coords[3][1]),
-        "24": (coords[4][0], coords[4][1]),
-    }
-
-    results = {}
-    for p in POINTS:
-        results[p] = {
-            "bearing": bearing_incoming[p],
-            "dN": dN_incoming[p],
-            "dE": dE_incoming[p],
-            "N": coord_by_point[p][0],
-            "E": coord_by_point[p][1],
-            "wrong_in_N": corN_incoming[p],
-            "wrong_in_E": corE_incoming[p],
-            "wrong_in_angle": wrong_in_angle_by_point[p],
-        }
-
-    results["_global"] = {
-        "f_beta": f_beta,
-        "fN": fN,
-        "fE": fE,
-        "fR": fR,
-        "total_length": total_L,
-    }
-
-    return results
+    radii = [p.get_radius() for p in pucks]
+    return {"frames": frames, "radii": radii}
 `);
 
       statusEl.textContent = "Ready.";
-      plotBtn.disabled = false;
+      simulateBtn.disabled = false;
     }
 
-	async function doPlot() {
-	  try {
-		plotBtn.disabled = true;
-		
-		if (!allObservationsFilled()) {
-		  flashMissingInputs();
-		  clearFlashClassAfter();
+    simulateBtn.addEventListener("click", () => {
+      doSimulate().catch(err => {
+        statusEl.textContent = "Error.";
+        simHintEl.textContent = err?.message || String(err);
+      });
+    });
 
-		  plotEl.innerHTML =
-			`<div class="hint" style="color:#fca5a5;">
-			  You must fill in all empty observations!
-			</div>`;
-		  statusEl.textContent = "Missing inputs.";
-		  return;
-		}
+    async function doSimulate(){
+      if (!pyodide) return;
+      if (pucks.length === 0){
+        statusEl.textContent = "Add at least one puck.";
+        return;
+      }
 
-		statusEl.textContent = "Computing + plotting…";
+      const friction = readNum("friction");
+      const T = readNum("T");
+      const dt = readNum("dt");
+      const fps = readNum("fps");
 
-		const inputs = collectInputs();
+      if ([friction, T, dt, fps].some(v => v === null)){
+        statusEl.textContent = "Please fill friction/T/dt/FPS with valid numbers.";
+        return;
+      }
+      if (friction < 0){
+        statusEl.textContent = "Friction must be >= 0.";
+        return;
+      }
+      if (T <= 0 || dt <= 0 || fps <= 0){
+        statusEl.textContent = "T, dt, FPS must be > 0.";
+        return;
+      }
 
-		pyodide.globals.set("inputs", pyodide.toPy(inputs));
-		const results = pyodide.runPython("compute(inputs)").toJs();
+      simulateBtn.disabled = true;
+      statusEl.textContent = "Simulating…";
+      simHintEl.textContent = "Simulating in Python, then animating in JS…";
 
-		clearOutputs();
-		fillOutputs(results);
+      clearAnimation();
 
-		const order = ["20", "21", "22", "23", "24", "20"]; 
-		const xs = [];
-		const ys = [];
+      // Pass data to Python
+      pyodide.globals.set("pucks_js", pyodide.toPy(pucks));
+      pyodide.globals.set("friction_js", friction);
+      pyodide.globals.set("dt_js", dt);
+      pyodide.globals.set("T_js", T);
+      pyodide.globals.set("fps_js", fps);
 
-		for (const p of order) {
-		  const pt = results?.[p];
-		  if (!pt || pt.E === undefined || pt.N === undefined || pt.E === null || pt.N === null) {
-			throw new Error(`Missing computed N/E for point ${p}.`);
-		  }
-		  xs.push(Number(pt.E)); 
-		  ys.push(Number(pt.N)); 
-		}
+      const out = pyodide.runPython("simulate(pucks_js, friction_js, dt_js, T_js, fps_js)").toJs();
 
-		pyodide.globals.set("xs_js", pyodide.toPy(xs));
-		pyodide.globals.set("ys_js", pyodide.toPy(ys));
-		const b64 = pyodide.runPython("plot_xy_to_base64(xs_js, ys_js)");
+      frames = out.frames;
+      radii = out.radii;
 
-		plotEl.innerHTML = `<img alt="Traverse plot" src="data:image/png;base64,${b64}">`;
+      // Compute simple bounds from all frames to keep everything in view
+      let xmin=Infinity, xmax=-Infinity, ymin=Infinity, ymax=-Infinity;
+      for (const fr of frames){
+        for (let i=0;i<fr.length;i++){
+          const x = fr[i][0], y = fr[i][1], r = radii[i];
+          xmin = Math.min(xmin, x - r);
+          xmax = Math.max(xmax, x + r);
+          ymin = Math.min(ymin, y - r);
+          ymax = Math.max(ymax, y + r);
+        }
+      }
+      const span = Math.max(xmax-xmin, ymax-ymin, 1.0);
+      const pad = 0.10 * span;
+      worldBounds = { xmin:xmin-pad, xmax:xmax+pad, ymin:ymin-pad, ymax:ymax+pad };
 
-		statusEl.textContent = "Done.";
-	  } catch (err) {
-		statusEl.textContent = "Error.";
-		plotEl.innerHTML = `<div class="hint" style="color:#b00020;">${err.message || err}</div>`;
-	  } finally {
-		plotBtn.disabled = false;
-	  }
-	}
+      frameIndex = 0;
+      statusEl.textContent = "Animating…";
+      simHintEl.textContent = `Frames: ${frames.length}`;
 
-	function collectInputs() {
-	  const inputs = {};
-	  document.querySelectorAll('#dataTable input[data-in]').forEach(el => {
-		const point = el.dataset.point;
-		const key = el.dataset.in;
+      rafId = requestAnimationFrame(animate);
 
-		const raw = el.value.trim();
-		const val = raw === "" ? null : Number(raw);
+      simulateBtn.disabled = false;
+    }
 
-		if (!inputs[point]) inputs[point] = {};
-		inputs[point][key] = Number.isFinite(val) ? val : null;
-	  });
-	  return inputs;
-	}
-
-	function clearOutputs() {
-	  document.querySelectorAll('#dataTable input.out[data-out]').forEach(el => {
-		el.value = "";
-	  });
-	}
-
-	function fillOutputs(results) {
-	  document.querySelectorAll('#dataTable input.out[data-out]').forEach(el => {
-		const key = el.dataset.out;
-		const point = el.dataset.point;
-
-		let value = null;
-
-		if (point) {
-		  value = results?.[point]?.[key];
-		} else {
-		  value = results?._global?.[key];
-		}
-
-		if (value === undefined || value === null) return;
-
-		el.value = (typeof value === "number")
-		  ? value.toFixed(4)
-		  : String(value);
-	  });
-	}
-
-	function allObservationsFilled() {
-	  const inputs = document.querySelectorAll('#dataTable input[data-in]');
-	  for (const el of inputs) {
-		if (el.value.trim() === "" || !Number.isFinite(Number(el.value))) {
-		  return false;
-		}
-	  }
-	  return true;
-	}
-	
-	function flashMissingInputs() {
-	  const inputs = document.querySelectorAll('#dataTable input[data-in]');
-	  for (const el of inputs) {
-		const v = el.value.trim();
-		const ok = v !== "" && Number.isFinite(Number(v));
-
-		if (!ok) {
-		  // remove first so animation can retrigger on repeated clicks
-		  el.classList.remove("flash-missing");
-		  // force reflow
-		  void el.offsetWidth;
-		  el.classList.add("flash-missing");
-		}
-	  }
-	}
-
-	function clearFlashClassAfter() {
-	  // clean up after animation ends (optional but tidy)
-	  setTimeout(() => {
-		document.querySelectorAll('#dataTable input.flash-missing')
-		  .forEach(el => el.classList.remove('flash-missing'));
-	  }, 450);
-	}
-
-    plotBtn.addEventListener("click", doPlot);
-
-    // Kick off initialization
-    initPyodideAndPackages().catch((err) => {
+    // init
+    renderPuckList();
+    initPyodideAndPackages().catch(err => {
       statusEl.textContent = "Failed to load Python.";
-      plotEl.innerHTML = `<div class="hint" style="color: #b00020;">${err.message}</div>`;
+      simHintEl.textContent = err?.message || String(err);
     });
   </script>
 </body>

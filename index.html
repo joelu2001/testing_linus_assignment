@@ -239,35 +239,35 @@
 	if (!lastTs) lastTs = ts;
 	const elapsed = ts - lastTs;
 
-	if (elapsed >= FRAME_MS) {
-		lastTs = ts - (elapsed % FRAME_MS);
+	// how many frames should we advance?
+	const advance = Math.floor(elapsed / FRAME_MS);
 
-		draw(frames[frameIndex], radii);
-		frameIndex++;
+	if (advance > 0) {
+		frameIndex += advance;
+		lastTs += advance * FRAME_MS;
 
 		if (frameIndex >= frames.length) {
+		frameIndex = frames.length - 1;
+		draw();
 		rafId = null;
 		statusEl.textContent = "Klar.";
 		return;
 		}
+
+		draw();
 	}
 
 	rafId = requestAnimationFrame(animate);
 	}
 
 	function startAnimation() {
-	if (rafId !== null) {
-		cancelAnimationFrame(rafId);
-		rafId = null;
-	}
-
+	if (rafId !== null) cancelAnimationFrame(rafId);
+	rafId = null;
 	frameIndex = 0;
 	lastTs = 0;
 	statusEl.textContent = "Simulerar...";
-
 	rafId = requestAnimationFrame(animate);
 	}
-
 
     async function initPyodideAndPackages(){
       statusEl.textContent = "Laddar Python runtime…";

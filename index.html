@@ -451,72 +451,63 @@ def simulate(pucks_data, friction, T):
       });
     });
 
-    async function doSimulate(){
-      if (!pyodide) return;
-      if (pucks.length === 0){
-        statusEl.textContent = "Add at least one puck.";
-        return;
-      }
+	async function doSimulate(){
+	if (!pyodide) return;
+	if (pucks.length === 0){
+		statusEl.textContent = "Add at least one puck.";
+		return;
+	}
 
-      const friction = readNum("friction");
-      const T = readNum("T");
-      const dt = readNum("dt");
-      const fps = readNum("fps");
+	const friction = readNum("friction");
+	const T = readNum("T");
 
-      if ([friction, T, dt, fps].some(v => v === null)){
-        statusEl.textContent = "Please fill friction/T/dt/FPS with valid numbers.";
-        return;
-      }
-      if (friction < 0){
-        statusEl.textContent = "Friction must be >= 0.";
-        return;
-      }
-      if (T <= 0 || dt <= 0 || fps <= 0){
-        statusEl.textContent = "T, dt, FPS must be > 0.";
-        return;
-      }
+	if ([friction, T].some(v => v === null)){
+		statusEl.textContent = "Please fill friction/T with valid numbers.";
+		return;
+	}
+	if (friction < 0){
+		statusEl.textContent = "Friction must be >= 0.";
+		return;
+	}
+	if (T <= 0){
+		statusEl.textContent = "T must be > 0.";
+		return;
+	}
 
-      simulateBtn.disabled = true;
-      statusEl.textContent = "Simulating…";
-      simHintEl.textContent = "Simulating in Python, then animating in JS…";
+	simulateBtn.disabled = true;
+	statusEl.textContent = "Simulating…";
+	simHintEl.textContent = "Simulating in Python, then animating in JS…";
 
-      clearAnimation();
+	clearAnimation();
 
-      // Pass data to Python
-      pyodide.globals.set("pucks_js", pyodide.toPy(pucks));
-      pyodide.globals.set("friction_js", friction);
-      pyodide.globals.set("dt_js", dt);
-      pyodide.globals.set("T_js", T);
-      pyodide.globals.set("fps_js", fps);
+	pyodide.globals.set("pucks_js", pyodide.toPy(pucks));
+	pyodide.globals.set("friction_js", friction);
+	pyodide.globals.set("T_js", T);
 
-      const out = pyodide.runPython("simulate(pucks_js, friction_js, dt_js, T_js, fps_js)").toJs();
+	const out = pyodide.runPython("simulate(pucks_js, friction_js, T_js)").toJs();
 
-      frames = out.frames;
-      radii = out.radii;
+	frames = out.frames;
+	radii = out.radii;
 
-      // Compute simple bounds from all frames to keep everything in view
-      let xmin=Infinity, xmax=-Infinity, ymin=Infinity, ymax=-Infinity;
-      for (const fr of frames){
-        for (let i=0;i<fr.length;i++){
-          const x = fr[i][0], y = fr[i][1], r = radii[i];
-          xmin = Math.min(xmin, x - r);
-          xmax = Math.max(xmax, x + r);
-          ymin = Math.min(ymin, y - r);
-          ymax = Math.max(ymax, y + r);
-        }
-      }
-      const span = Math.max(xmax-xmin, ymax-ymin, 1.0);
-      const pad = 0.10 * span;
-      worldBounds = { xmin:xmin-pad, xmax:xmax+pad, ymin:ymin-pad, ymax:ymax+pad };
+	// bounds
+	let xmin=Infinity, xmax=-Infinity, ymin=Infinity, ymax=-Infinity;
+	for (const fr of frames){
+		for (let i=0;i<fr.length;i++){
+		const x = fr[i][0], y = fr[i][1], r = radii[i];
+		xmin = Math.min(xmin, x - r);
+		xmax = Math.max(xmax, x + r);
+		ymin = Math.min(ymin, y - r);
+		ymax = Math.max(ymax, y + r);
+		}
+	}
+	const span = Math.max(xmax-xmin, ymax-ymin, 1.0);
+	const pad = 0.10 * span;
+	worldBounds = { xmin:xmin-pad, xmax:xmax+pad, ymin:ymin-pad, ymax:ymax+pad };
 
-      frameIndex = 0;
-      statusEl.textContent = "Animating…";
-      simHintEl.textContent = `Frames: ${frames.length}`;
+	startAnimation();
 
-      rafId = requestAnimationFrame(animate);
-
-      simulateBtn.disabled = false;
-    }
+	simulateBtn.disabled = false;
+	}
 
     // init
     renderPuckList();

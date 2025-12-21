@@ -25,20 +25,17 @@
     .puck-list {display:flex;flex-direction:column;gap:8px;}
     .puck-item {display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid #333;background:#171717;border-radius:10px;padding:8px;}
     .puck-item code {font-size:0.85rem;opacity:0.95;}
-    .danger {border-color:#7f1d1d;}
     .hint {font-size:0.9rem;opacity:0.9;}
 
-    #simArea {flex:1;border:1px solid #333;background:#111;border-radius:12px;display:grid;place-items:center;overflow:hidden;}
-    canvas {max-width:100%;height:auto;display:block;}
+    #simArea {flex:1;border:1px solid #333;background:#111;border-radius:12px;display:grid;place-items:center;overflow:hidden;padding:10px;}
+    #simArea img {max-width:100%;height:auto;display:block;border-radius:10px;}
     .topbar {display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="left">
-	<div class="author-note">
-		Utvecklat av Joel Utsi & Linus Andersson
-	</div>
+      <div class="author-note">Utvecklat av Joel Utsi & Linus Andersson</div>
       <h2>Puckdata</h2>
 
       <div class="row">
@@ -88,7 +85,7 @@
       </div>
 
       <div id="simArea">
-        <canvas id="canvas" width="900" height="600"></canvas>
+        <div class="hint">Ingen animation ännu.</div>
       </div>
     </div>
   </div>
@@ -102,19 +99,10 @@
     const addPuckBtn = document.getElementById("addPuckBtn");
     const puckListEl = document.getElementById("puckList");
     const simHintEl = document.getElementById("simHint");
-
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
+    const simAreaEl = document.getElementById("simArea");
 
     let pyodide = null;
     let pucks = []; // JS list of puck definitions
-
-    // Animation state
-	let frames = null;      // array: frames[frameIndex] = [[x,y], [x,y], ...]
-	let radii = null;       // array: radii[i]
-	let frameIndex = 0;
-	let rafId = null;
-    let worldBounds = {xmin:-2, xmax:2, ymin:-2, ymax:2}; // simple default
 
     function isFiniteNumber(x){ return Number.isFinite(x); }
     function readNum(id){
@@ -171,114 +159,21 @@
       statusEl.textContent = "Puck tillagd.";
     });
 
-    function clearAnimation(){
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = null;
-      frames = null;
-      radii = null;
-      frameIndex = 0;
-      draw(); // draw empty
-    }
-
-    function worldToCanvas(x, y){
-      const {xmin,xmax,ymin,ymax} = worldBounds;
-      const w = canvas.width, h = canvas.height;
-      const sx = (x - xmin) / (xmax - xmin) * w;
-      const sy = h - (y - ymin) / (ymax - ymin) * h;
-      return [sx, sy];
-    }
-
-    function radiusToCanvas(r){
-      const {xmin,xmax} = worldBounds;
-      const w = canvas.width;
-      return r / (xmax - xmin) * w;
-    }
-
-    function draw(){
-      ctx.clearRect(0,0,canvas.width, canvas.height);
-
-      // background grid (simple)
-      ctx.globalAlpha = 0.18;
-      ctx.beginPath();
-      const step = 50;
-      for (let x=0; x<=canvas.width; x+=step){ ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); }
-      for (let y=0; y<=canvas.height; y+=step){ ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); }
-      ctx.strokeStyle = "#ffffff";
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      if (!frames || frameIndex >= frames.length) return;
-
-      const frame = frames[frameIndex];
-      for (let i=0; i<frame.length; i++){
-        const [x,y] = frame[i];
-        const [cx,cy] = worldToCanvas(x,y);
-        const rr = radiusToCanvas(radii[i]);
-
-        ctx.beginPath();
-        ctx.arc(cx, cy, rr, 0, Math.PI*2);
-        ctx.strokeStyle = "#e0e0e0";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // small center dot
-        ctx.beginPath();
-        ctx.arc(cx, cy, 2.5, 0, Math.PI*2);
-        ctx.fillStyle = "#e0e0e0";
-        ctx.fill();
-      }
-    }
-
-	const FPS = 60;
-	const FRAME_MS = 1000 / FPS;
-	let lastTs = 0;
-
-	function animate(ts) {
-	if (!frames || frames.length === 0) return;
-
-	if (!lastTs) lastTs = ts;
-	const elapsed = ts - lastTs;
-
-	// how many frames should we advance?
-	const advance = Math.floor(elapsed / FRAME_MS);
-
-	if (advance > 0) {
-		frameIndex += advance;
-		lastTs += advance * FRAME_MS;
-
-		if (frameIndex >= frames.length) {
-		frameIndex = frames.length - 1;
-		draw();
-		rafId = null;
-		statusEl.textContent = "Klar.";
-		return;
-		}
-
-		draw();
-	}
-
-	rafId = requestAnimationFrame(animate);
-	}
-
-	function startAnimation() {
-	if (rafId !== null) cancelAnimationFrame(rafId);
-	rafId = null;
-	frameIndex = 0;
-	lastTs = 0;
-	statusEl.textContent = "Simulerar...";
-	rafId = requestAnimationFrame(animate);
-	}
-
     async function initPyodideAndPackages(){
       statusEl.textContent = "Laddar Python runtime…";
       pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/" });
 
-      statusEl.textContent = "Laddar numpy…";
-      await pyodide.loadPackage(["numpy"]);
+      statusEl.textContent = "Laddar numpy + matplotlib + pillow…";
+      await pyodide.loadPackage(["numpy", "matplotlib", "pillow"]);
 
-      // Define simulation code in Python (close to your reference).
       pyodide.runPython(`
-import math
+import math, base64
+from io import BytesIO
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 class Puck:
     def __init__(self, pos, radius, mass, cor):
@@ -358,7 +253,6 @@ class Room:
         return self._collision_equations(m1, m2, e, n, v1, v2)
 
     def _collision_equations(self, m1, m2, e, n, v1, v2):
-        # same formula as your reference
         rel = self._diff(v1, v2)
         k = self._prod(rel, n)
         v1_after = self._diff(v1, self._mult_scalar((1 + e) * m2 / (m1 + m2) * k, n))
@@ -379,7 +273,6 @@ class Room:
         return self._prod(d, d) < r * r
 
     def _deceleration(self, puck):
-        # friction deceleration magnitude mu*g, opposite velocity direction
         g = 9.82
         vx, vy = puck.get_velocity()
         speed = math.sqrt(vx*vx + vy*vy)
@@ -404,7 +297,7 @@ class Room:
 DT = 0.002
 FPS = 60
 
-def simulate(pucks_data, friction, T):
+def simulate_to_gif_base64(pucks_data, friction, T):
     dt = DT
     fps = FPS
     T = float(T)
@@ -425,20 +318,71 @@ def simulate(pucks_data, friction, T):
         pucks.append(puck)
 
     steps = int(max(1, math.ceil(T / dt)))
-
-    # record frames so animation plays at ~60 fps
     target_frames = max(1, int(T * fps))
     k = max(1, steps // target_frames)
 
     frames = []
+    radii = [p.get_radius() for p in pucks]
+
     for s in range(steps + 1):
         if s % k == 0:
-            frames.append([list(p.get_pos()) for p in pucks])
+            frames.append([p.get_pos() for p in pucks])
         room.update_step(dt)
 
-    radii = [p.get_radius() for p in pucks]
-    return {"frames": frames, "radii": radii, "dt": dt, "fps": fps}
-`);
+    # bounds from all frames + radii
+    xs, ys = [], []
+    for fr in frames:
+        for (x,y) in fr:
+            xs.append(x); ys.append(y)
+    if xs:
+        xmin, xmax = min(xs), max(xs)
+        ymin, ymax = min(ys), max(ys)
+    else:
+        xmin=xmax=ymin=ymax=0.0
+
+    rmax = max(radii) if radii else 0.2
+    span = max(xmax-xmin, ymax-ymin, 1.0)
+    pad = 0.15 * span + rmax
+    xlim = (xmin - pad, xmax + pad)
+    ylim = (ymin - pad, ymax + pad)
+
+    # Build animation in Matplotlib
+    fig, ax = plt.subplots(figsize=(6, 4), dpi=150)
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
+    ax.set_aspect("equal", adjustable="box")
+    ax.grid(True, alpha=0.25)
+
+    circles = []
+    for i, r in enumerate(radii):
+        c = Circle((0,0), r, fill=False, linewidth=2)
+        ax.add_patch(c)
+        circles.append(c)
+
+    title = ax.set_title("t = 0.00 s")
+
+    def init():
+        for c in circles:
+            c.center = (0,0)
+        title.set_text("t = 0.00 s")
+        return circles + [title]
+
+    def update(fi):
+        fr = frames[fi]
+        for i, c in enumerate(circles):
+            x,y = fr[i]
+            c.center = (x,y)
+        title.set_text(f"t = {fi / fps:.2f} s")
+        return circles + [title]
+
+    anim = FuncAnimation(fig, update, init_func=init, frames=len(frames), interval=1000/fps, blit=True)
+
+    buf = BytesIO()
+    anim.save(buf, writer=PillowWriter(fps=fps), format="gif")
+    plt.close(fig)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode("utf-8")
+      `);
 
       statusEl.textContent = "Redo.";
       simulateBtn.disabled = false;
@@ -451,63 +395,46 @@ def simulate(pucks_data, friction, T):
       });
     });
 
-	async function doSimulate(){
-	if (!pyodide) return;
-	if (pucks.length === 0){
-		statusEl.textContent = "Lägg till åtminstone en puck.";
-		return;
-	}
+    async function doSimulate(){
+      if (!pyodide) return;
+      if (pucks.length === 0){
+        statusEl.textContent = "Lägg till åtminstone en puck.";
+        return;
+      }
 
-	const friction = readNum("friction");
-	const T = readNum("T");
+      const friction = readNum("friction");
+      const T = readNum("T");
 
-	if ([friction, T].some(v => v === null)){
-		statusEl.textContent = "Fyll i friction/T med giltiga tal.";
-		return;
-	}
-	if (friction < 0){
-		statusEl.textContent = "Friktionen måste vara >= 0.";
-		return;
-	}
-	if (T <= 0){
-		statusEl.textContent = "T måste vara > 0.";
-		return;
-	}
+      if ([friction, T].some(v => v === null)){
+        statusEl.textContent = "Fyll i friction/T med giltiga tal.";
+        return;
+      }
+      if (friction < 0){
+        statusEl.textContent = "Friktionen måste vara >= 0.";
+        return;
+      }
+      if (T <= 0){
+        statusEl.textContent = "T måste vara > 0.";
+        return;
+      }
 
-	simulateBtn.disabled = true;
-	statusEl.textContent = "Simulerar...";
-	simHintEl.textContent = "Simulerar i Python, animerar i JS…";
+      simulateBtn.disabled = true;
+      statusEl.textContent = "Simulerar + renderar GIF…";
+      simHintEl.textContent = "Allt sker i Python (Matplotlib).";
 
-	clearAnimation();
+      // Pass data to Python
+      pyodide.globals.set("pucks_js", pyodide.toPy(pucks));
+      pyodide.globals.set("friction_js", friction);
+      pyodide.globals.set("T_js", T);
 
-	pyodide.globals.set("pucks_js", pyodide.toPy(pucks));
-	pyodide.globals.set("friction_js", friction);
-	pyodide.globals.set("T_js", T);
+      const b64gif = pyodide.runPython("simulate_to_gif_base64(pucks_js, friction_js, T_js)");
 
-	const out = pyodide.runPython("simulate(pucks_js, friction_js, T_js)").toJs();
+      simAreaEl.innerHTML = `<img alt="Simulation GIF" src="data:image/gif;base64,${b64gif}">`;
 
-	frames = out.frames;
-	radii = out.radii;
-
-	// bounds
-	let xmin=Infinity, xmax=-Infinity, ymin=Infinity, ymax=-Infinity;
-	for (const fr of frames){
-		for (let i=0;i<fr.length;i++){
-		const x = fr[i][0], y = fr[i][1], r = radii[i];
-		xmin = Math.min(xmin, x - r);
-		xmax = Math.max(xmax, x + r);
-		ymin = Math.min(ymin, y - r);
-		ymax = Math.max(ymax, y + r);
-		}
-	}
-	const span = Math.max(xmax-xmin, ymax-ymin, 1.0);
-	const pad = 0.10 * span;
-	worldBounds = { xmin:xmin-pad, xmax:xmax+pad, ymin:ymin-pad, ymax:ymax+pad };
-
-	startAnimation();
-
-	simulateBtn.disabled = false;
-	}
+      statusEl.textContent = "Klar.";
+      simHintEl.textContent = "GIF genererad av Matplotlib.";
+      simulateBtn.disabled = false;
+    }
 
     // init
     renderPuckList();

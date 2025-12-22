@@ -12,14 +12,16 @@ The website can be found at: https://joelu2001.github.io/testing_linus_assignmen
 
 ## Examples:
 
-- Two pucks colliding head on without friction
+Below are 
 
-![Demo](gifs/1_fast.gif)
+1. Two pucks colliding head on without friction
 
-- One puck colliding with another at rest with friction
+![Demo](gifs/1.gif)
 
-![Demo](gifs/2_fast.gif)
+2. One puck colliding with another at rest with friction
 
-- Three pucks colliding with friction
+![Demo](gifs/2.gif)
 
-![Demo](gifs/3_fast.gif)
+3. Three pucks colliding with friction
+
+![Demo](gifs/3.gif)

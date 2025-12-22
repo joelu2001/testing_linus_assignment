@@ -9,3 +9,9 @@ The website can be found at: https://joelu2001.github.io/testing_linus_assignmen
 - Set the room attributes and add pucks in the left menu
 - Press *Simulera!* when ready.
 - View the simulation to the right!
+
+## Examples:
+
+- 2 pucks colliding head on
+
+![Demo](gifs/1.gif)

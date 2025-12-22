@@ -416,28 +416,30 @@ def simulate_to_gif_base64(pucks_data, friction, T):
     anim.save(out_path, writer=writer)
     plt.close(fig)
 
-    # Re-save with PIL to reduce looping (many viewers honor loop=1)
     try:
         im = Image.open(out_path)
-        frames = []
+
+        pil_frames = []
         try:
             while True:
-                frames.append(im.copy())
-                im.seek(len(frames))
+                pil_frames.append(im.copy())
+                im.seek(im.tell() + 1)
         except EOFError:
             pass
 
-        if len(frames) >= 1:
-            frames[0].save(
+        if len(pil_frames) >= 1:
+            pil_frames[0].save(
                 out_path,
                 save_all=True,
-                append_images=frames[1:],
+                append_images=pil_frames[1:],
                 duration=int(1000 / fps),
-                loop=1,          # try to avoid infinite looping
-                disposal=2
+                loop=None,    
+                disposal=2,
+                optimize=False
             )
     except Exception:
         pass
+
 
     with open(out_path, "rb") as f:
         data = f.read()

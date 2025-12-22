@@ -12,7 +12,7 @@ The website can be found at: https://joelu2001.github.io/testing_linus_assignmen
 
 ## Examples:
 
-Below are 
+Below are examples of three different collision simulations.
 
 1. Two pucks colliding head on without friction
 

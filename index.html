@@ -398,7 +398,7 @@ def simulate_to_gif_base64(pucks_data, friction, T):
         lines = []
         for i, ((x, y), (vx, vy)) in enumerate(zip(pos, vel), start=1):
             lines.append(f"P{i}:  x={x:+.2f}  y={y:+.2f}   vx={vx:+.2f}  vy={vy:+.2f}")
-        hud.set_text("\n".join(lines))
+        hud.set_text("\\n".join(lines))
 
         return circles + [hud]
 

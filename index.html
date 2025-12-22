@@ -167,27 +167,24 @@
       await pyodide.loadPackage(["numpy", "matplotlib", "pillow"]);
 
       pyodide.runPython(`
-import math, base64, os
+import math, base64
 from io import BytesIO
-
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-# ---------------- Physics ----------------
-
 class Puck:
     def __init__(self, pos, radius, mass, cor):
-        self.pos = (float(pos[0]), float(pos[1]))
-        self.radius = float(radius)
-        self.mass = float(mass)
-        self.cor = float(cor)
+        self.pos = pos
+        self.radius = radius
+        self.mass = mass
+        self.cor = cor
         self.velocity = (0.0, 0.0)
 
     def set_position(self, pos):
-        self.pos = (float(pos[0]), float(pos[1]))
+        self.pos = pos
 
     def set_velocity(self, vx, vy):
         self.velocity = (float(vx), float(vy))
@@ -206,7 +203,6 @@ class Puck:
 
     def get_cor(self):
         return self.cor
-
 
 class Room:
     def __init__(self, friction):
@@ -228,33 +224,26 @@ class Room:
                     p1.set_velocity(*v1_after)
                     p2.set_velocity(*v2_after)
 
-                    # separate overlap (simple)
+                    # separate overlap
                     n = self.collision_normal(p1, p2)
                     d = self.distance(p1, p2)
                     collision_radius = p1.get_radius() + p2.get_radius()
                     dist = math.sqrt(self._prod(d, d))
                     extra_margin = (collision_radius - dist) if dist > 0 else collision_radius
-                    p1.set_position(self._sum(p1.get_pos(), self._mult_scalar(+0.5 * extra_margin, n)))
-                    p2.set_position(self._sum(p2.get_pos(), self._mult_scalar(-0.5 * extra_margin, n)))
+                    p1.set_position(self._sum(p1.get_pos(), self._mult_scalar(extra_margin, n)))
+                    p2.set_position(self._sum(p2.get_pos(), self._mult_scalar(-extra_margin, n)))
 
         # integrate
         for puck in self.pucks:
             vx, vy = puck.get_velocity()
             x, y = puck.get_pos()
 
-            # position
-            x2, y2 = x + dt * vx, y + dt * vy
+            new_pos = (x + dt * vx, y + dt * vy)
+            ax_, ay_ = self._deceleration(puck)
+            new_v = (vx - dt * ax_, vy - dt * ay_)
 
-            # friction decel
-            ax, ay = self._deceleration(puck)
-            vx2, vy2 = vx - dt * ax, vy - dt * ay
-
-            # stop tiny drift
-            if vx2 * vx2 + vy2 * vy2 < 1e-10:
-                vx2, vy2 = 0.0, 0.0
-
-            puck.set_position((x2, y2))
-            puck.set_velocity(vx2, vy2)
+            puck.set_position(new_pos)
+            puck.set_velocity(*new_v)
 
     def collision_velocities(self, p1, p2):
         m1, m2 = p1.get_mass(), p2.get_mass()
@@ -286,24 +275,22 @@ class Room:
     def _deceleration(self, puck):
         g = 9.82
         vx, vy = puck.get_velocity()
-        speed = math.sqrt(vx * vx + vy * vy)
+        speed = math.sqrt(vx*vx + vy*vy)
         if speed == 0.0:
             return (0.0, 0.0)
         dir_v = (vx / speed, vy / speed)
-        # magnitude = mu*g
         return self._mult_scalar(self.friction * g, dir_v)
 
-    def _prod(self, a, b): return a[0] * b[0] + a[1] * b[1]
-    def _diff(self, a, b): return (a[0] - b[0], a[1] - b[1])
-    def _sum(self, a, b):  return (a[0] + b[0], a[1] + b[1])
-    def _mult_scalar(self, s, v): return (s * v[0], s * v[1])
+    def _prod(self, a, b): return a[0]*b[0] + a[1]*b[1]
+    def _diff(self, a, b): return (a[0]-b[0], a[1]-b[1])
+    def _sum(self, a, b):  return (a[0]+b[0], a[1]+b[1])
+    def _mult_scalar(self, s, v): return (s*v[0], s*v[1])
     def _div(self, v, s):
-        if s == 0.0: return (0.0, 0.0)
-        return (v[0] / s, v[1] / s)
+        if s == 0.0:
+            return (0.0, 0.0)
+        return (v[0]/s, v[1]/s)
 
-# ---------------- Rendering ----------------
-
-DT  = 0.002
+DT = 0.002
 FPS = 24
 
 def simulate_to_gif_base64(pucks_data, friction, T):
@@ -332,115 +319,112 @@ def simulate_to_gif_base64(pucks_data, friction, T):
     target_frames = max(1, int(T * fps))
     k = max(1, steps // target_frames)
 
-    # Store BOTH position and velocity per puck per frame
-    frames = []
+    frames_pos = []
+    frames_vel = []
     for s in range(steps + 1):
         if s % k == 0:
-            frames.append([(pu.get_pos(), pu.get_velocity()) for pu in pucks])
+            frames_pos.append([p.get_pos() for p in pucks])
+            frames_vel.append([p.get_velocity() for p in pucks])
         room.update_step(dt)
 
-    radii = [pu.get_radius() for pu in pucks]
+    radii = [p.get_radius() for p in pucks]
 
-    # Compute bounds from positions only
+    # Compute bounds
     xmin = ymin = float("inf")
     xmax = ymax = float("-inf")
-    for fr in frames:
-        for i, (pos, vel) in enumerate(fr):
-            x, y = pos
+    for fr in frames_pos:
+        for i, (x, y) in enumerate(fr):
             r = radii[i]
             xmin = min(xmin, x - r); xmax = max(xmax, x + r)
             ymin = min(ymin, y - r); ymax = max(ymax, y + r)
-
     span = max(xmax - xmin, ymax - ymin, 1.0)
     pad = 0.12 * span
     xmin -= pad; xmax += pad; ymin -= pad; ymax += pad
 
-    # --- "Modern" dark look ---
-    fig, ax = plt.subplots(figsize=(7.0, 4.5), dpi=140)
-    fig.patch.set_facecolor("#0f1115")
-    ax.set_facecolor("#0f1115")
+    # --- Modern styling ---
+    fig, ax = plt.subplots(figsize=(7, 4.5), dpi=140)
+    fig.patch.set_facecolor("#0b0f14")
+    ax.set_facecolor("#0b0f14")
 
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
     ax.set_aspect("equal", adjustable="box")
 
-    # Remove axes/border entirely
-    ax.set_axis_off()
+    # Remove ALL borders/axes
+    ax.set_xticks([]); ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
 
-    # Puck circles
+    # Pucks
     circles = []
+    labels = []
     for i in range(len(pucks)):
-        c = Circle((0, 0), radii[i], fill=False, linewidth=2.5, edgecolor="#e0e0e0")
+        c = Circle((0, 0), radii[i], fill=False, linewidth=2.2)
         ax.add_patch(c)
         circles.append(c)
 
-    # HUD text INSIDE the plot (top-left)
+        t = ax.text(
+            0, 0, f"{i+1}",
+            ha="center", va="center",
+            fontsize=9, fontweight="bold",
+            color="#e6edf3"
+        )
+        labels.append(t)
+
+    # HUD (top-left inside axes)
     hud = ax.text(
         0.02, 0.98, "",
         transform=ax.transAxes,
-        va="top", ha="left",
-        fontsize=10,
-        color="#e6e6e6",
+        ha="left", va="top",
+        fontsize=9,
         family="monospace",
-        bbox=dict(boxstyle="round,pad=0.45", facecolor=(0,0,0,0.35), edgecolor=(1,1,1,0.10))
+        color="#e6edf3",
+        bbox=dict(boxstyle="round,pad=0.5", fc=(0, 0, 0, 0.35), ec=(1, 1, 1, 0.08), lw=1)
     )
 
     def init():
-        # Start circles at first frame positions
-        fr0 = frames[0]
-        for i, (pos, vel) in enumerate(fr0):
-            circles[i].center = pos
+        for c in circles:
+            c.center = (0, 0)
+        for t in labels:
+            t.set_position((0, 0))
         hud.set_text("")
-        return circles + [hud]
+        return circles + labels + [hud]
 
     def update(frame_idx):
-        fr = frames[frame_idx]
+        frp = frames_pos[frame_idx]
+        frv = frames_vel[frame_idx]
 
-        # update circles
-        for i, (pos, vel) in enumerate(fr):
-            circles[i].center = pos
+        # Move circles + per-puck numeric label
+        for i, (x, y) in enumerate(frp):
+            circles[i].center = (x, y)
+            labels[i].set_position((x, y))
 
-        # update HUD text (pos + vel for each puck)
+        # Build HUD text (no multi-line string literals => no unterminated string)
         lines = []
-        for i, (pos, vel) in enumerate(fr):
-            x, y = pos
-            vx, vy = vel
-            lines.append(f"Puck {i+1}:  x={x:+.2f}  y={y:+.2f}   vx={vx:+.2f}  vy={vy:+.2f}")
+        for i, ((x, y), (vx, vy)) in enumerate(zip(frp, frv)):
+            lines.append(f"Puck {i+1}:  pos=({x:+.2f}, {y:+.2f})   v=({vx:+.2f}, {vy:+.2f})")
         hud.set_text("\n".join(lines))
 
-        return circles + [hud]
+        return circles + labels + [hud]
 
     anim = FuncAnimation(
         fig,
         update,
         init_func=init,
-        frames=len(frames),
+        frames=len(frames_pos),
         interval=1000 / fps,
         blit=True,
     )
 
-    # Save to a real file path (Pyodide/Matplotlib requires this)
+    import os
     out_path = "/tmp/sim.gif"
     writer = PillowWriter(fps=fps)
     anim.save(out_path, writer=writer)
     plt.close(fig)
 
-    # Force "no loop" GIF (best-effort across viewers)
-    from PIL import Image, ImageSequence
-    im = Image.open(out_path)
-    seq = [f.copy() for f in ImageSequence.Iterator(im)]
-    duration = int(1000 / fps)
-    seq[0].save(
-        out_path,
-        save_all=True,
-        append_images=seq[1:],
-        duration=duration,
-        loop=1,          # many viewers interpret this as "play once"
-        disposal=2
-    )
-
     with open(out_path, "rb") as f:
         data = f.read()
+
     try:
         os.remove(out_path)
     except Exception:

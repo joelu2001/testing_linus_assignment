@@ -323,10 +323,10 @@ def simulate_to_gif_base64(pucks_data, friction, T):
     target_frames = max(1, int(T * fps))
     k = max(1, steps // target_frames)
 
-    frames_pos = []
+    frames = []
     for s in range(steps + 1):
         if s % k == 0:
-            frames_pos.append([p.get_pos() for p in pucks])
+            frames.append([p.get_pos() for p in pucks])
         room.update_step(dt)
 
     radii = [p.get_radius() for p in pucks]
@@ -334,7 +334,7 @@ def simulate_to_gif_base64(pucks_data, friction, T):
     # Compute bounds
     xmin = ymin = float("inf")
     xmax = ymax = float("-inf")
-    for fr in frames_pos:
+    for fr in frames:
         for i, (x, y) in enumerate(fr):
             r = radii[i]
             xmin = min(xmin, x - r); xmax = max(xmax, x + r)
@@ -343,7 +343,7 @@ def simulate_to_gif_base64(pucks_data, friction, T):
     pad = 0.10 * span
     xmin -= pad; xmax += pad; ymin -= pad; ymax += pad
 
-    # Prepare figure once
+    # Build animation
     fig, ax = plt.subplots(figsize=(6, 4), dpi=120)
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
@@ -355,35 +355,44 @@ def simulate_to_gif_base64(pucks_data, friction, T):
         ax.add_patch(c)
         circles.append(c)
 
-    pil_frames = []
-    for frame_idx, fr in enumerate(frames_pos):
+    def init():
+        for c in circles:
+            c.center = (0, 0)
+        return circles
+
+    def update(frame_idx):
+        fr = frames[frame_idx]
         for i, (x, y) in enumerate(fr):
             circles[i].center = (x, y)
         ax.set_title(f"t = {frame_idx/fps:.2f} s")
+        return circles
 
-        # Render this frame to a PNG in memory, then load as PIL Image
-        png_buf = BytesIO()
-        fig.canvas.draw()
-        fig.savefig(png_buf, format="png")
-        png_buf.seek(0)
-        pil_frames.append(Image.open(png_buf).convert("P"))
+    anim = FuncAnimation(
+        fig,
+        update,
+        init_func=init,
+        frames=len(frames),
+        interval=1000 / fps,
+        blit=True,
+    )
 
+    import os
+
+    out_path = "/tmp/sim.gif"
+    writer = PillowWriter(fps=fps)
+    anim.save(out_path, writer=writer)
     plt.close(fig)
 
-    # Save GIF to memory. IMPORTANT: do NOT pass loop=0 (that loops forever).
-    gif_buf = BytesIO()
-    duration_ms = int(1000 / fps)
-    pil_frames[0].save(
-        gif_buf,
-        format="GIF",
-        save_all=True,
-        append_images=pil_frames[1:],
-        duration=duration_ms,
-        disposal=2,
-        loop=None,   # or just remove this line entirely
-    )
-    gif_buf.seek(0)
-    return base64.b64encode(gif_buf.read()).decode("utf-8")
+    with open(out_path, "rb") as f:
+        data = f.read()
+
+    try:
+        os.remove(out_path)
+    except Exception:
+        pass
+
+    return base64.b64encode(data).decode("utf-8")
+
       `);
 
       statusEl.textContent = "Redo.";

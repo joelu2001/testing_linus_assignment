@@ -500,8 +500,8 @@ def simulate_to_media_base64(pucks_data, friction, T):
       }
 
       simulateBtn.disabled = true;
-      statusEl.textContent = "Simulerar + renderar GIF…";
-      simHintEl.textContent = "Allt sker i Python (Matplotlib).";
+      statusEl.textContent = "Simulerar + renderar GIF...";
+      simHintEl.textContent = "Simulerar i Matplotlib...";
 
       simAreaEl.innerHTML = `<div class="hint">Renderar…</div>`;
 
@@ -526,7 +526,7 @@ def simulate_to_media_base64(pucks_data, friction, T):
       simAreaEl.innerHTML = `<img id="simImg" alt="Simulation GIF" src="data:image/gif;base64,${gifB64}">`;
 
       statusEl.textContent = "Klar.";
-      simHintEl.textContent = "Tryck Simulera! för ny körning.";
+      simHintEl.textContent = "Tryck Simulera! för ny simulering.";
       simulateBtn.disabled = false;
     }
 

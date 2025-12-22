@@ -175,6 +175,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.animation import FuncAnimation, PillowWriter
+from PIL import Image
 
 class Puck:
     def __init__(self, pos, radius, mass, cor):
@@ -320,6 +321,7 @@ def simulate_to_media_base64(pucks_data, friction, T):
 
     steps = int(max(1, math.ceil(T / dt)))
 
+    # Record ~fps frames
     target_frames = max(1, int(T * fps))
     k = max(1, steps // target_frames)
 
@@ -333,6 +335,7 @@ def simulate_to_media_base64(pucks_data, friction, T):
 
     radii = [p.get_radius() for p in pucks]
 
+    # Bounds
     xmin = ymin = float("inf")
     xmax = ymax = float("-inf")
     for fr in frames_pos:
@@ -344,6 +347,7 @@ def simulate_to_media_base64(pucks_data, friction, T):
     pad = 0.12 * span
     xmin -= pad; xmax += pad; ymin -= pad; ymax += pad
 
+    # --- Modern look ---
     fig, ax = plt.subplots(figsize=(6.4, 4.0), dpi=140)
     bg = "#0f1115"
     fig.patch.set_facecolor(bg)
@@ -353,16 +357,32 @@ def simulate_to_media_base64(pucks_data, friction, T):
     ax.set_ylim(ymin, ymax)
     ax.set_aspect("equal", adjustable="box")
 
+    # No axes, no border
     ax.set_xticks([]); ax.set_yticks([])
     for sp in ax.spines.values():
         sp.set_visible(False)
 
+    # Pucks
     circles = []
     for i in range(len(pucks)):
         c = Circle((0, 0), radii[i], fill=False, linewidth=2.2, edgecolor="#e6e6e6", alpha=0.95)
         ax.add_patch(c)
         circles.append(c)
 
+    # Labels at puck centers: P1, P2, ...
+    texts = []
+    for i in range(len(pucks)):
+        t = ax.text(
+            0, 0, f"P{i+1}",
+            ha="center", va="center",
+            fontsize=9,
+            color="#eaeaea",
+            family="sans-serif",
+            weight="bold",
+        )
+        texts.append(t)
+
+    # HUD at bottom, smaller + less intrusive
     hud = ax.text(
         0.02, 0.02, "",
         transform=ax.transAxes,
@@ -381,8 +401,9 @@ def simulate_to_media_base64(pucks_data, friction, T):
         if len(frames_pos) > 0:
             for i, (x, y) in enumerate(frames_pos[0]):
                 circles[i].center = (x, y)
+                texts[i].set_position((x, y))
         hud.set_text("")
-        return circles + [hud]
+        return circles + texts + [hud]
 
     def update(frame_idx):
         pos = frames_pos[frame_idx]
@@ -390,13 +411,15 @@ def simulate_to_media_base64(pucks_data, friction, T):
 
         for i, (x, y) in enumerate(pos):
             circles[i].center = (x, y)
+            texts[i].set_position((x, y))
 
         lines = []
         for i, ((x, y), (vx, vy)) in enumerate(zip(pos, vel), start=1):
             lines.append(f"P{i}: x={x:+.2f} y={y:+.2f}  vx={vx:+.2f} vy={vy:+.2f}")
 
+        # IMPORTANT: must be \\n because this code lives inside a JS template string
         hud.set_text("\\n".join(lines))
-        return circles + [hud]
+        return circles + texts + [hud]
 
     anim = FuncAnimation(
         fig,
@@ -420,9 +443,12 @@ def simulate_to_media_base64(pucks_data, friction, T):
     except Exception:
         pass
 
-    # Return only the GIF for looping
+    duration_ms = int(len(frames_pos) * (1000 / fps))
+
     return {
-        "gif_b64": base64.b64encode(gif_bytes).decode("utf-8")
+        "gif_b64": base64.b64encode(gif_bytes).decode("utf-8"),
+        "last_png_b64": "",
+        "duration_ms": duration_ms
     }
       `);
 
@@ -437,6 +463,7 @@ def simulate_to_media_base64(pucks_data, friction, T):
       });
     });
 
+    let lastFreezeTimer = null;
     let simRunId = 0;
 
     async function doSimulate(){
@@ -462,8 +489,14 @@ def simulate_to_media_base64(pucks_data, friction, T):
         return;
       }
 
+      // New run token (so old results don't overwrite new ones)
       simRunId += 1;
       const runId = simRunId;
+
+      if (lastFreezeTimer) {
+        clearTimeout(lastFreezeTimer);
+        lastFreezeTimer = null;
+      }
 
       simulateBtn.disabled = true;
       statusEl.textContent = "Simulerar + renderar GIF…";
@@ -489,8 +522,8 @@ def simulate_to_media_base64(pucks_data, friction, T):
 
       const gifB64 = res.gif_b64;
 
-      // Fresh <img> each run so the animation restarts
-      simAreaEl.innerHTML = `<img alt="Simulation GIF" src="data:image/gif;base64,${gifB64}">`;
+      // Show looping GIF (fresh <img> each run)
+      simAreaEl.innerHTML = `<img id="simImg" alt="Simulation GIF" src="data:image/gif;base64,${gifB64}">`;
 
       statusEl.textContent = "Klar.";
       simHintEl.textContent = "Tryck Simulera! för ny körning.";

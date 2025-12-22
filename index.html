@@ -321,7 +321,6 @@ def simulate_to_gif_base64(pucks_data, friction, T):
 
     steps = int(max(1, math.ceil(T / dt)))
 
-    # Record ~fps frames
     target_frames = max(1, int(T * fps))
     k = max(1, steps // target_frames)
 
@@ -335,7 +334,6 @@ def simulate_to_gif_base64(pucks_data, friction, T):
 
     radii = [p.get_radius() for p in pucks]
 
-    # Bounds
     xmin = ymin = float("inf")
     xmax = ymax = float("-inf")
     for fr in frames_pos:
@@ -347,7 +345,6 @@ def simulate_to_gif_base64(pucks_data, friction, T):
     pad = 0.12 * span
     xmin -= pad; xmax += pad; ymin -= pad; ymax += pad
 
-    # --- Modern look ---
     fig, ax = plt.subplots(figsize=(6.4, 4.0), dpi=140)
     bg = "#0f1115"
     fig.patch.set_facecolor(bg)
@@ -357,28 +354,31 @@ def simulate_to_gif_base64(pucks_data, friction, T):
     ax.set_ylim(ymin, ymax)
     ax.set_aspect("equal", adjustable="box")
 
-    # Remove all axes/border
     ax.set_xticks([]); ax.set_yticks([])
     for sp in ax.spines.values():
         sp.set_visible(False)
 
-    # Pucks (outlined circles)
     circles = []
     for i in range(len(pucks)):
         c = Circle((0, 0), radii[i], fill=False, linewidth=2.2, edgecolor="#e6e6e6", alpha=0.95)
         ax.add_patch(c)
         circles.append(c)
 
-    # HUD text inside plot (this fixes your unterminated string issues)
     hud = ax.text(
-        0.02, 0.98, "",
+        0.02, 0.02, "",    
         transform=ax.transAxes,
-        va="top", ha="left",
-        fontsize=9,
-        color="#eaeaea",
+        va="bottom", ha="left",
+        fontsize=7.5,               
+        color="#cfd3d8",             
         family="monospace",
-        bbox=dict(boxstyle="round,pad=0.35", facecolor=(0,0,0,0.35), edgecolor=(1,1,1,0.15))
+        bbox=dict(
+            boxstyle="round,pad=0.2",
+            facecolor=(0, 0, 0, 0.18),   
+            edgecolor=(1, 1, 1, 0.08),
+            linewidth=0.6
+        )
     )
+
 
     def init():
         # initialize at first frame

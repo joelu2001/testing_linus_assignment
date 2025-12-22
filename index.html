@@ -300,7 +300,9 @@ class Room:
 DT = 0.002
 FPS = 24
 
-def simulate_to_gif_base64(pucks_data, friction, T):
+FPS = 24
+
+def simulate_to_media_base64(pucks_data, friction, T):
     dt = DT
     fps = FPS
     T = float(T)
@@ -321,6 +323,7 @@ def simulate_to_gif_base64(pucks_data, friction, T):
 
     steps = int(max(1, math.ceil(T / dt)))
 
+    # Record ~fps frames
     target_frames = max(1, int(T * fps))
     k = max(1, steps // target_frames)
 
@@ -334,6 +337,7 @@ def simulate_to_gif_base64(pucks_data, friction, T):
 
     radii = [p.get_radius() for p in pucks]
 
+    # Bounds
     xmin = ymin = float("inf")
     xmax = ymax = float("-inf")
     for fr in frames_pos:
@@ -345,6 +349,7 @@ def simulate_to_gif_base64(pucks_data, friction, T):
     pad = 0.12 * span
     xmin -= pad; xmax += pad; ymin -= pad; ymax += pad
 
+    # --- Modern look ---
     fig, ax = plt.subplots(figsize=(6.4, 4.0), dpi=140)
     bg = "#0f1115"
     fig.patch.set_facecolor(bg)
@@ -354,34 +359,34 @@ def simulate_to_gif_base64(pucks_data, friction, T):
     ax.set_ylim(ymin, ymax)
     ax.set_aspect("equal", adjustable="box")
 
+    # No axes, no border
     ax.set_xticks([]); ax.set_yticks([])
     for sp in ax.spines.values():
         sp.set_visible(False)
 
+    # Pucks
     circles = []
     for i in range(len(pucks)):
         c = Circle((0, 0), radii[i], fill=False, linewidth=2.2, edgecolor="#e6e6e6", alpha=0.95)
         ax.add_patch(c)
         circles.append(c)
 
+    # HUD at bottom, smaller + less intrusive
     hud = ax.text(
-        0.02, 0.02, "",    
+        0.02, 0.02, "",
         transform=ax.transAxes,
         va="bottom", ha="left",
-        fontsize=7.5,               
-        color="#cfd3d8",             
+        fontsize=7,
+        color="#eaeaea",
         family="monospace",
         bbox=dict(
-            boxstyle="round,pad=0.2",
-            facecolor=(0, 0, 0, 0.18),   
-            edgecolor=(1, 1, 1, 0.08),
-            linewidth=0.6
+            boxstyle="round,pad=0.25",
+            facecolor=(0,0,0,0.22),
+            edgecolor=(1,1,1,0.10)
         )
     )
 
-
     def init():
-        # initialize at first frame
         if len(frames_pos) > 0:
             for i, (x, y) in enumerate(frames_pos[0]):
                 circles[i].center = (x, y)
@@ -397,9 +402,10 @@ def simulate_to_gif_base64(pucks_data, friction, T):
 
         lines = []
         for i, ((x, y), (vx, vy)) in enumerate(zip(pos, vel), start=1):
-            lines.append(f"P{i}:  x={x:+.2f}  y={y:+.2f}   vx={vx:+.2f}  vy={vy:+.2f}")
-        hud.set_text("\\n".join(lines))
+            lines.append(f"P{i}: x={x:+.2f} y={y:+.2f}  vx={vx:+.2f} vy={vy:+.2f}")
 
+        # IMPORTANT: must be \\n because this code lives inside a JS template string
+        hud.set_text("\\n".join(lines))
         return circles + [hud]
 
     anim = FuncAnimation(
@@ -416,41 +422,34 @@ def simulate_to_gif_base64(pucks_data, friction, T):
     anim.save(out_path, writer=writer)
     plt.close(fig)
 
+    # Read GIF bytes + extract last frame PNG
+    with open(out_path, "rb") as f:
+        gif_bytes = f.read()
+
+    png_b64 = ""
     try:
         im = Image.open(out_path)
+        im.seek(im.n_frames - 1)
+        last = im.convert("RGBA")
 
-        pil_frames = []
-        try:
-            while True:
-                pil_frames.append(im.copy())
-                im.seek(im.tell() + 1)
-        except EOFError:
-            pass
-
-        if len(pil_frames) >= 1:
-            pil_frames[0].save(
-                out_path,
-                save_all=True,
-                append_images=pil_frames[1:],
-                duration=int(1000 / fps),
-                loop=None,    
-                disposal=2,
-                optimize=False
-            )
+        bio = BytesIO()
+        last.save(bio, format="PNG")
+        png_b64 = base64.b64encode(bio.getvalue()).decode("utf-8")
     except Exception:
-        pass
-
-
-    with open(out_path, "rb") as f:
-        data = f.read()
+        png_b64 = ""
 
     try:
         os.remove(out_path)
     except Exception:
         pass
 
-    return base64.b64encode(data).decode("utf-8")
+    duration_ms = int(len(frames_pos) * (1000 / fps))
 
+    return {
+        "gif_b64": base64.b64encode(gif_bytes).decode("utf-8"),
+        "last_png_b64": png_b64,
+        "duration_ms": duration_ms
+    }
       `);
 
       statusEl.textContent = "Redo.";
@@ -464,46 +463,89 @@ def simulate_to_gif_base64(pucks_data, friction, T):
       });
     });
 
-    async function doSimulate(){
-      if (!pyodide) return;
-      if (pucks.length === 0){
-        statusEl.textContent = "Lägg till åtminstone en puck.";
-        return;
-      }
+	let lastFreezeTimer = null;
+	let simRunId = 0;
 
-      const friction = readNum("friction");
-      const T = readNum("T");
+	async function doSimulate(){
+	if (!pyodide) return;
+	if (pucks.length === 0){
+		statusEl.textContent = "Lägg till åtminstone en puck.";
+		return;
+	}
 
-      if ([friction, T].some(v => v === null)){
-        statusEl.textContent = "Fyll i friction/T med giltiga tal.";
-        return;
-      }
-      if (friction < 0){
-        statusEl.textContent = "Friktionen måste vara >= 0.";
-        return;
-      }
-      if (T <= 0){
-        statusEl.textContent = "T måste vara > 0.";
-        return;
-      }
+	const friction = readNum("friction");
+	const T = readNum("T");
 
-      simulateBtn.disabled = true;
-      statusEl.textContent = "Simulerar + renderar GIF…";
-      simHintEl.textContent = "Allt sker i Python (Matplotlib).";
+	if ([friction, T].some(v => v === null)){
+		statusEl.textContent = "Fyll i friction/T med giltiga tal.";
+		return;
+	}
+	if (friction < 0){
+		statusEl.textContent = "Friktionen måste vara >= 0.";
+		return;
+	}
+	if (T <= 0){
+		statusEl.textContent = "T måste vara > 0.";
+		return;
+	}
 
-      // Pass data to Python
-      pyodide.globals.set("pucks_js", pyodide.toPy(pucks));
-      pyodide.globals.set("friction_js", friction);
-      pyodide.globals.set("T_js", T);
+	// New run token (so old results don't overwrite new ones)
+	simRunId += 1;
+	const runId = simRunId;
 
-      const b64gif = pyodide.runPython("simulate_to_gif_base64(pucks_js, friction_js, T_js)");
+	// Cancel any pending "freeze to last frame"
+	if (lastFreezeTimer) {
+		clearTimeout(lastFreezeTimer);
+		lastFreezeTimer = null;
+	}
 
-      simAreaEl.innerHTML = `<img alt="Simulation GIF" src="data:image/gif;base64,${b64gif}">`;
+	simulateBtn.disabled = true;
+	statusEl.textContent = "Simulerar + renderar GIF…";
+	simHintEl.textContent = "Allt sker i Python (Matplotlib).";
 
-      statusEl.textContent = "Klar.";
-      simHintEl.textContent = "GIF genererad av Matplotlib.";
-      simulateBtn.disabled = false;
-    }
+	// Optional: show a small placeholder immediately
+	simAreaEl.innerHTML = `<div class="hint">Renderar…</div>`;
+
+	// Pass data to Python
+	pyodide.globals.set("pucks_js", pyodide.toPy(pucks));
+	pyodide.globals.set("friction_js", friction);
+	pyodide.globals.set("T_js", T);
+
+	// Run Python (async so UI stays responsive)
+	const pyRes = await pyodide.runPythonAsync(
+		"simulate_to_media_base64(pucks_js, friction_js, T_js)"
+	);
+
+	// If user started a newer run, ignore this result
+	if (runId !== simRunId) {
+		try { pyRes.destroy(); } catch(e) {}
+		return;
+	}
+
+	const res = pyRes.toJs({ dict_converter: Object.fromEntries });
+	try { pyRes.destroy(); } catch(e) {}
+
+	const gifB64 = res.gif_b64;
+	const lastPngB64 = res.last_png_b64;
+	const durationMs = res.duration_ms || 0;
+
+	// Show GIF (fresh <img> each run)
+	simAreaEl.innerHTML = `<img id="simImg" alt="Simulation GIF" src="data:image/gif;base64,${gifB64}">`;
+
+	// After it finishes, swap to last frame PNG => "stops" at end
+	if (lastPngB64 && durationMs > 0) {
+		lastFreezeTimer = setTimeout(() => {
+		// still the latest run?
+		if (runId !== simRunId) return;
+		const img = document.getElementById("simImg");
+		if (img) img.src = `data:image/png;base64,${lastPngB64}`;
+		}, durationMs);
+	}
+
+	statusEl.textContent = "Klar.";
+	simHintEl.textContent = "Tryck Simulera! för ny körning.";
+	simulateBtn.disabled = false;
+	}
 
     // init
     renderPuckList();

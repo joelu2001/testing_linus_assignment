@@ -27,36 +27,9 @@
     .puck-item code {font-size:0.85rem;opacity:0.95;}
     .hint {font-size:0.9rem;opacity:0.9;}
 
-    #simArea {
-      flex:1;
-      border:1px solid #333;
-      background:#0f0f10;
-      border-radius:12px;
-      display:grid;
-      place-items:center;
-      overflow:hidden;
-      padding:10px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-    }
-    #simArea img {max-width:100%;height:auto;display:block;border-radius:12px;}
+    #simArea {flex:1;border:1px solid #333;background:#111;border-radius:12px;display:grid;place-items:center;overflow:hidden;padding:10px;}
+    #simArea img {max-width:100%;height:auto;display:block;border-radius:10px;}
     .topbar {display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-
-    /* Stats table */
-    #statsArea {margin-top: 0;}
-    table.stats {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.92rem;
-    }
-    table.stats th, table.stats td {
-      border-bottom: 1px solid #2a2a2a;
-      padding: 8px 6px;
-      text-align: right;
-      white-space: nowrap;
-    }
-    table.stats th:first-child, table.stats td:first-child {text-align: left;}
-    table.stats th {opacity: 0.85; font-weight: 600;}
-    .mono {font-variant-numeric: tabular-nums;}
   </style>
 </head>
 <body>
@@ -114,10 +87,6 @@
       <div id="simArea">
         <div class="hint">Ingen animation ännu.</div>
       </div>
-
-      <div id="statsArea" class="card">
-        <div class="hint">Ingen statistik ännu.</div>
-      </div>
     </div>
   </div>
 
@@ -131,10 +100,9 @@
     const puckListEl = document.getElementById("puckList");
     const simHintEl = document.getElementById("simHint");
     const simAreaEl = document.getElementById("simArea");
-    const statsAreaEl = document.getElementById("statsArea");
 
     let pyodide = null;
-    let pucks = []; 
+    let pucks = []; // JS list of puck definitions
 
     function isFiniteNumber(x){ return Number.isFinite(x); }
     function readNum(id){
@@ -199,7 +167,7 @@
       await pyodide.loadPackage(["numpy", "matplotlib", "pillow"]);
 
       pyodide.runPython(`
-import math, base64, json, os
+import math, base64, os
 from io import BytesIO
 
 import matplotlib
@@ -208,18 +176,18 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-from PIL import Image, ImageSequence
+# ---------------- Physics ----------------
 
 class Puck:
     def __init__(self, pos, radius, mass, cor):
-        self.pos = pos
-        self.radius = radius
-        self.mass = mass
-        self.cor = cor
+        self.pos = (float(pos[0]), float(pos[1]))
+        self.radius = float(radius)
+        self.mass = float(mass)
+        self.cor = float(cor)
         self.velocity = (0.0, 0.0)
 
     def set_position(self, pos):
-        self.pos = pos
+        self.pos = (float(pos[0]), float(pos[1]))
 
     def set_velocity(self, vx, vy):
         self.velocity = (float(vx), float(vy))
@@ -238,6 +206,7 @@ class Puck:
 
     def get_cor(self):
         return self.cor
+
 
 class Room:
     def __init__(self, friction):
@@ -265,20 +234,27 @@ class Room:
                     collision_radius = p1.get_radius() + p2.get_radius()
                     dist = math.sqrt(self._prod(d, d))
                     extra_margin = (collision_radius - dist) if dist > 0 else collision_radius
-                    p1.set_position(self._sum(p1.get_pos(), self._mult_scalar(extra_margin, n)))
-                    p2.set_position(self._sum(p2.get_pos(), self._mult_scalar(-extra_margin, n)))
+                    p1.set_position(self._sum(p1.get_pos(), self._mult_scalar(+0.5 * extra_margin, n)))
+                    p2.set_position(self._sum(p2.get_pos(), self._mult_scalar(-0.5 * extra_margin, n)))
 
         # integrate
         for puck in self.pucks:
-            v = puck.get_velocity()
-            pos = puck.get_pos()
+            vx, vy = puck.get_velocity()
+            x, y = puck.get_pos()
 
-            new_pos = self._sum(pos, self._mult_scalar(dt, v))
-            a = self._deceleration(puck)
-            new_v = self._diff(v, self._mult_scalar(dt, a))
+            # position
+            x2, y2 = x + dt * vx, y + dt * vy
 
-            puck.set_position(new_pos)
-            puck.set_velocity(*new_v)
+            # friction decel
+            ax, ay = self._deceleration(puck)
+            vx2, vy2 = vx - dt * ax, vy - dt * ay
+
+            # stop tiny drift
+            if vx2 * vx2 + vy2 * vy2 < 1e-10:
+                vx2, vy2 = 0.0, 0.0
+
+            puck.set_position((x2, y2))
+            puck.set_velocity(vx2, vy2)
 
     def collision_velocities(self, p1, p2):
         m1, m2 = p1.get_mass(), p2.get_mass()
@@ -310,45 +286,27 @@ class Room:
     def _deceleration(self, puck):
         g = 9.82
         vx, vy = puck.get_velocity()
-        speed = math.sqrt(vx*vx + vy*vy)
+        speed = math.sqrt(vx * vx + vy * vy)
         if speed == 0.0:
             return (0.0, 0.0)
         dir_v = (vx / speed, vy / speed)
+        # magnitude = mu*g
         return self._mult_scalar(self.friction * g, dir_v)
 
-    def _prod(self, a, b):
-        return a[0]*b[0] + a[1]*b[1]
-    def _diff(self, a, b):
-        return (a[0]-b[0], a[1]-b[1])
-    def _sum(self, a, b):
-        return (a[0]+b[0], a[1]+b[1])
-    def _mult_scalar(self, s, v):
-        return (s*v[0], s*v[1])
+    def _prod(self, a, b): return a[0] * b[0] + a[1] * b[1]
+    def _diff(self, a, b): return (a[0] - b[0], a[1] - b[1])
+    def _sum(self, a, b):  return (a[0] + b[0], a[1] + b[1])
+    def _mult_scalar(self, s, v): return (s * v[0], s * v[1])
     def _div(self, v, s):
-        if s == 0.0:
-            return (0.0, 0.0)
-        return (v[0]/s, v[1]/s)
+        if s == 0.0: return (0.0, 0.0)
+        return (v[0] / s, v[1] / s)
 
-DT = 0.002
+# ---------------- Rendering ----------------
+
+DT  = 0.002
 FPS = 24
 
-def _resave_gif_no_loop(gif_bytes, duration_ms):
-    # Re-save WITHOUT a Netscape loop extension (=> plays once in most viewers)
-    im = Image.open(BytesIO(gif_bytes))
-    frames = [frame.copy() for frame in ImageSequence.Iterator(im)]
-    out = BytesIO()
-    frames[0].save(
-        out,
-        format="GIF",
-        save_all=True,
-        append_images=frames[1:],
-        duration=duration_ms,
-        disposal=2,
-        optimize=True,
-    )
-    return out.getvalue()
-
-def simulate_to_result_json(pucks_data, friction, T):
+def simulate_to_gif_base64(pucks_data, friction, T):
     dt = DT
     fps = FPS
     T = float(T)
@@ -370,73 +328,87 @@ def simulate_to_result_json(pucks_data, friction, T):
 
     steps = int(max(1, math.ceil(T / dt)))
 
+    # Record ~fps frames
     target_frames = max(1, int(T * fps))
     k = max(1, steps // target_frames)
 
+    # Store BOTH position and velocity per puck per frame
     frames = []
     for s in range(steps + 1):
         if s % k == 0:
-            frames.append([p.get_pos() for p in pucks])
+            frames.append([(pu.get_pos(), pu.get_velocity()) for pu in pucks])
         room.update_step(dt)
 
-    radii = [p.get_radius() for p in pucks]
+    radii = [pu.get_radius() for pu in pucks]
 
-    # bounds
+    # Compute bounds from positions only
     xmin = ymin = float("inf")
     xmax = ymax = float("-inf")
     for fr in frames:
-        for i, (x, y) in enumerate(fr):
+        for i, (pos, vel) in enumerate(fr):
+            x, y = pos
             r = radii[i]
             xmin = min(xmin, x - r); xmax = max(xmax, x + r)
             ymin = min(ymin, y - r); ymax = max(ymax, y + r)
+
     span = max(xmax - xmin, ymax - ymin, 1.0)
     pad = 0.12 * span
     xmin -= pad; xmax += pad; ymin -= pad; ymax += pad
 
-    # modern-ish look: dark bg, no axes, soft outline pucks
-    fig, ax = plt.subplots(figsize=(6.4, 4.2), dpi=140)
-    fig.patch.set_facecolor("#0f0f10")
-    ax.set_facecolor("#0f0f10")
+    # --- "Modern" dark look ---
+    fig, ax = plt.subplots(figsize=(7.0, 4.5), dpi=140)
+    fig.patch.set_facecolor("#0f1115")
+    ax.set_facecolor("#0f1115")
+
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
     ax.set_aspect("equal", adjustable="box")
 
+    # Remove axes/border entirely
     ax.set_axis_off()
-    for spine in ax.spines.values():
-        spine.set_visible(False)
 
-    # subtle "arena" rectangle feel via margins (no border line)
-    ax.margins(0)
-
+    # Puck circles
     circles = []
-    # a small palette (kept muted)
-    palette = ["#7dd3fc", "#a7f3d0", "#fda4af", "#fde68a", "#c4b5fd", "#fdba74", "#93c5fd", "#f9a8d4"]
-
     for i in range(len(pucks)):
-        c = Circle(
-            (0, 0),
-            radii[i],
-            fill=True,
-            facecolor=palette[i % len(palette)],
-            edgecolor="white",
-            linewidth=1.3,
-            alpha=0.85,
-        )
+        c = Circle((0, 0), radii[i], fill=False, linewidth=2.5, edgecolor="#e0e0e0")
         ax.add_patch(c)
         circles.append(c)
 
+    # HUD text INSIDE the plot (top-left)
+    hud = ax.text(
+        0.02, 0.98, "",
+        transform=ax.transAxes,
+        va="top", ha="left",
+        fontsize=10,
+        color="#e6e6e6",
+        family="monospace",
+        bbox=dict(boxstyle="round,pad=0.45", facecolor=(0,0,0,0.35), edgecolor=(1,1,1,0.10))
+    )
+
     def init():
+        # Start circles at first frame positions
         fr0 = frames[0]
-        for i, (x, y) in enumerate(fr0):
-            circles[i].center = (x, y)
-        return circles
+        for i, (pos, vel) in enumerate(fr0):
+            circles[i].center = pos
+        hud.set_text("")
+        return circles + [hud]
 
     def update(frame_idx):
         fr = frames[frame_idx]
-        for i, (x, y) in enumerate(fr):
-            circles[i].center = (x, y)
-        # NO title/time text
-        return circles
+
+        # update circles
+        for i, (pos, vel) in enumerate(fr):
+            circles[i].center = pos
+
+        # update HUD text (pos + vel for each puck)
+        lines = []
+        for i, (pos, vel) in enumerate(fr):
+            x, y = pos
+            vx, vy = vel
+            lines.append(f"Puck {i+1}:  x={x:+.2f}  y={y:+.2f}   vx={vx:+.2f}  vy={vy:+.2f}")
+        hud.set_text("\n".join(lines))
+
+        return circles + [hud]
 
     anim = FuncAnimation(
         fig,
@@ -447,46 +419,34 @@ def simulate_to_result_json(pucks_data, friction, T):
         blit=True,
     )
 
+    # Save to a real file path (Pyodide/Matplotlib requires this)
     out_path = "/tmp/sim.gif"
     writer = PillowWriter(fps=fps)
     anim.save(out_path, writer=writer)
     plt.close(fig)
 
+    # Force "no loop" GIF (best-effort across viewers)
+    from PIL import Image, ImageSequence
+    im = Image.open(out_path)
+    seq = [f.copy() for f in ImageSequence.Iterator(im)]
+    duration = int(1000 / fps)
+    seq[0].save(
+        out_path,
+        save_all=True,
+        append_images=seq[1:],
+        duration=duration,
+        loop=1,          # many viewers interpret this as "play once"
+        disposal=2
+    )
+
     with open(out_path, "rb") as f:
-        raw_gif = f.read()
+        data = f.read()
     try:
         os.remove(out_path)
     except Exception:
         pass
 
-    # remove looping by re-saving without loop extension
-    duration_ms = int(round(1000 / fps))
-    gif_no_loop = _resave_gif_no_loop(raw_gif, duration_ms)
-
-    # final stats
-    stats = []
-    for i, puck in enumerate(pucks):
-        x, y = puck.get_pos()
-        vx, vy = puck.get_velocity()
-        speed = math.sqrt(vx*vx + vy*vy)
-        stats.append({
-            "id": i + 1,
-            "x": x, "y": y,
-            "vx": vx, "vy": vy,
-            "speed": speed,
-            "r": puck.get_radius(),
-            "m": puck.get_mass(),
-            "e": puck.get_cor(),
-        })
-
-    result = {
-        "gif_b64": base64.b64encode(gif_no_loop).decode("utf-8"),
-        "fps": fps,
-        "T": T,
-        "friction": friction,
-        "stats": stats,
-    }
-    return json.dumps(result)
+    return base64.b64encode(data).decode("utf-8")
       `);
 
       statusEl.textContent = "Redo.";
@@ -499,45 +459,6 @@ def simulate_to_result_json(pucks_data, friction, T):
         simHintEl.textContent = err?.message || String(err);
       });
     });
-
-    function renderStats(result){
-      const stats = result.stats || [];
-      if (!stats.length){
-        statsAreaEl.innerHTML = `<div class="hint">Ingen statistik.</div>`;
-        return;
-      }
-
-      const rows = stats.map(s => `
-        <tr class="mono">
-          <td>#${s.id}</td>
-          <td>${s.x.toFixed(3)}</td>
-          <td>${s.y.toFixed(3)}</td>
-          <td>${s.vx.toFixed(3)}</td>
-          <td>${s.vy.toFixed(3)}</td>
-          <td>${s.speed.toFixed(3)}</td>
-        </tr>
-      `).join("");
-
-      statsAreaEl.innerHTML = `
-        <h3 style="margin: 0 0 8px 0;">Slutvärden</h3>
-        <div class="hint" style="margin-bottom:8px; opacity:0.85;">
-          T=${result.T.toFixed(2)} s, μ=${result.friction.toFixed(2)}, fps=${result.fps}
-        </div>
-        <table class="stats">
-          <thead>
-            <tr>
-              <th>Puck</th>
-              <th>x</th>
-              <th>y</th>
-              <th>vx</th>
-              <th>vy</th>
-              <th>|v|</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      `;
-    }
 
     async function doSimulate(){
       if (!pyodide) return;
@@ -566,25 +487,17 @@ def simulate_to_result_json(pucks_data, friction, T):
       statusEl.textContent = "Simulerar + renderar GIF…";
       simHintEl.textContent = "Allt sker i Python (Matplotlib).";
 
-      simAreaEl.innerHTML = `<div class="hint">Renderar ny animation…</div>`;
-
+      // Pass data to Python
       pyodide.globals.set("pucks_js", pyodide.toPy(pucks));
       pyodide.globals.set("friction_js", friction);
       pyodide.globals.set("T_js", T);
 
-      const resultJson = pyodide.runPython("simulate_to_result_json(pucks_js, friction_js, T_js)");
-      const result = JSON.parse(resultJson);
+      const b64gif = pyodide.runPython("simulate_to_gif_base64(pucks_js, friction_js, T_js)");
 
-      simAreaEl.innerHTML = "";
-      const img = document.createElement("img");
-      img.alt = "Simulation GIF";
-      img.src = `data:image/gif;base64,${result.gif_b64}`;
-      simAreaEl.appendChild(img);
-
-      renderStats(result);
+      simAreaEl.innerHTML = `<img alt="Simulation GIF" src="data:image/gif;base64,${b64gif}">`;
 
       statusEl.textContent = "Klar.";
-      simHintEl.textContent = "GIF genererad av Matplotlib (spelar en gång).";
+      simHintEl.textContent = "GIF genererad av Matplotlib.";
       simulateBtn.disabled = false;
     }
 

@@ -1,27 +1,27 @@
 # testing_linus_assignment
 
-This repository generates a GitHub Pages website which simulates simple 2D collision in the plane. This is part of an on-going course development initiative at the V-programme which aims to introduce digitalisation and programming at the V-programme. The source code has been developed by **Joel Utsi and Linus Andersson** and is entirely open source.
+Detta repository genererar en GitHub Pages-webbplats som simulerar enkla 2D-kollisioner i planet. Detta är en del av ett pågående kursutvecklingsprojekt på V-programmet som syftar till att introducera digitalisering och programmering på V-programmet. Källkoden har utvecklats av **Joel Utsi och Linus Andersson** och är helt öppen källkod.
 
-The website can be found at: https://joelu2001.github.io/testing_linus_assignment/
+Webbplatsen finns på: https://joelu2001.github.io/testing_linus_assignment/
 
-## Instructions:
+## Instruktioner:
 
-- Set the room attributes and add pucks in the left menu
-- Press *Simulera!* when ready.
-- View the simulation to the right!
+- Ställ in rummets attribut och lägg till puckar i vänstermenyn
+- Tryck på *Simulera!* när du är redo.
+- Se simuleringen till höger!
 
-## Examples:
+## Exempel:
 
-Below are examples of three different collision simulations.
+Nedan visas exempel på tre olika kollisionssimulationer.
 
-1. Two pucks colliding head on without friction
+1. Två puckar som kolliderar frontalt utan friktion
 
 ![Demo](gifs/1.gif)
 
-2. One puck colliding with another at rest with friction
+2. En puck som kolliderar med en annan i vila med friktion
 
 ![Demo](gifs/2.gif)
 
-3. Three pucks colliding with friction
+3. Tre puckar som kolliderar med friktion
 
 ![Demo](gifs/3.gif)

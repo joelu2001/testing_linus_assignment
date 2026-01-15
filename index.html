@@ -52,6 +52,11 @@
           </label>
 
           <label>
+            Stöttal (e)
+            <input id="cor" type="number" step="0.01" value="0.30" />
+          </label>
+
+          <label>
             Simuleringstid (s)
             <input id="T" type="number" step="0.1" value="5.0" />
           </label>
@@ -65,13 +70,12 @@
           <label>pos y <input id="py" class="small" type="number" step="0.1" value="-1.0"></label>
           <label>radie <input id="pr" class="small" type="number" step="0.01" value="0.15"></label>
           <label>massa <input id="pm" class="small" type="number" step="0.01" value="1.0"></label>
-          <label>e <input id="pcor" class="small" type="number" step="0.01" value="0.30"></label>
           <label>vx <input id="pvx" class="small" type="number" step="0.1" value="2.0"></label>
           <label>vy <input id="pvy" class="small" type="number" step="0.1" value="2.0"></label>
 
           <button id="addPuckBtn">Lägg till puck</button>
         </div>
-        <div class="hint">Lägger till puck med position, radie, massa, stöttal, och begynnelsehastighet.</div>
+        <div class="hint">Lägger till puck med position, radie, massa, och begynnelsehastighet.</div>
 
         <h3 style="margin-top:12px;">Puckar</h3>
         <div id="puckList" class="puck-list"></div>
@@ -122,7 +126,7 @@
         div.innerHTML = `
           <code>
             #${idx+1} pos=(${p.x.toFixed(2)}, ${p.y.toFixed(2)})
-            r=${p.radius.toFixed(2)} m=${p.mass.toFixed(2)} cor=${p.cor.toFixed(2)}
+            r=${p.radius.toFixed(2)} m=${p.mass.toFixed(2)}
             v=(${p.vx.toFixed(2)}, ${p.vy.toFixed(2)})
           </code>
           <button data-remove="${idx}">Ta bort</button>
@@ -137,10 +141,10 @@
 
     addPuckBtn.addEventListener("click", () => {
       const x = readNum("px"), y = readNum("py"), radius = readNum("pr"),
-            mass = readNum("pm"), cor = readNum("pcor"),
+            mass = readNum("pm"),
             vx = readNum("pvx"), vy = readNum("pvy");
 
-      const vals = [x,y,radius,mass,cor,vx,vy];
+      const vals = [x,y,radius,mass,vx,vy];
       if (vals.some(v => v === null)){
         statusEl.textContent = "Fyll i alla puck-fält med giltiga tal.";
         return;
@@ -149,12 +153,8 @@
         statusEl.textContent = "Radie och massa måste vara > 0.";
         return;
       }
-      if (cor < 0 || cor > 1){
-        statusEl.textContent = "e är i intervallet [0, 1].";
-        return;
-      }
 
-      pucks.push({x,y,radius,mass,cor,vx,vy});
+      pucks.push({x,y,radius,mass,vx,vy});
       renderPuckList();
       statusEl.textContent = "Puck tillagd.";
     });
@@ -178,11 +178,10 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 from PIL import Image
 
 class Puck:
-    def __init__(self, pos, radius, mass, cor):
+    def __init__(self, pos, radius, mass):
         self.pos = pos
         self.radius = radius
         self.mass = mass
-        self.cor = cor
         self.velocity = (0.0, 0.0)
 
     def set_position(self, pos):
@@ -203,12 +202,10 @@ class Puck:
     def get_mass(self):
         return self.mass
 
-    def get_cor(self):
-        return self.cor
-
 class Room:
-    def __init__(self, friction):
+    def __init__(self, friction, cor):
         self.friction = float(friction)
+        self.cor = float(cor)
         self.pucks = []
 
     def add(self, puck):
@@ -250,7 +247,7 @@ class Room:
 
     def collision_velocities(self, p1, p2):
         m1, m2 = p1.get_mass(), p2.get_mass()
-        e = max(p1.get_cor(), p2.get_cor())
+        e = self.cor
         n = self.collision_normal(p1, p2)
         v1, v2 = p1.get_velocity(), p2.get_velocity()
         return self._collision_equations(m1, m2, e, n, v1, v2)
@@ -300,20 +297,20 @@ class Room:
 DT = 0.002
 FPS = 24
 
-def simulate_to_media_base64(pucks_data, friction, T):
+def simulate_to_media_base64(pucks_data, friction, cor, T):
     dt = DT
     fps = FPS
     T = float(T)
     friction = float(friction)
+    cor = float(cor)
 
-    room = Room(friction)
+    room = Room(friction, cor)
     pucks = []
     for p in pucks_data:
         puck = Puck(
             (float(p["x"]), float(p["y"])),
             float(p["radius"]),
             float(p["mass"]),
-            float(p["cor"]),
         )
         puck.set_velocity(float(p["vx"]), float(p["vy"]))
         room.add(puck)
@@ -364,7 +361,7 @@ def simulate_to_media_base64(pucks_data, friction, T):
         ax.add_patch(c)
         circles.append(c)
 
-    label_offset = 0.02 * span  # tweak if you want more/less gap
+    label_offset = 0.02 * span 
 
     texts = []
     for i in range(len(pucks)):
@@ -468,14 +465,19 @@ def simulate_to_media_base64(pucks_data, friction, T):
       }
 
       const friction = readNum("friction");
+      const cor = readNum("cor");
       const T = readNum("T");
 
-      if ([friction, T].some(v => v === null)){
-        statusEl.textContent = "Fyll i friction/T med giltiga tal.";
+      if ([friction, cor, T].some(v => v === null)){
+        statusEl.textContent = "Fyll i friction/e/T med giltiga tal.";
         return;
       }
       if (friction < 0){
         statusEl.textContent = "Friktionen måste vara >= 0.";
+        return;
+      }
+      if (cor < 0 || cor > 1){
+        statusEl.textContent = "e är i intervallet [0, 1].";
         return;
       }
       if (T <= 0){
@@ -499,10 +501,11 @@ def simulate_to_media_base64(pucks_data, friction, T):
 
       pyodide.globals.set("pucks_js", pyodide.toPy(pucks));
       pyodide.globals.set("friction_js", friction);
+      pyodide.globals.set("cor_js", cor);
       pyodide.globals.set("T_js", T);
 
       const pyRes = await pyodide.runPythonAsync(
-        "simulate_to_media_base64(pucks_js, friction_js, T_js)"
+        "simulate_to_media_base64(pucks_js, friction_js, cor_js, T_js)"
       );
 
       if (runId !== simRunId) {

@@ -1,6 +1,6 @@
 # testing_linus_assignment
 
-Detta repository genererar en GitHub Pages-webbplats som simulerar enkla 2D-kollisioner i planet. Detta är en del av ett pågående kursutvecklingsprojekt på V-programmet som syftar till att introducera digitalisering och programmering på V-programmet. Källkoden har utvecklats av **Joel Utsi och Linus Andersson** och är helt öppen källkod.
+Detta repository genererar en GitHub Pages-webbplats som simulerar enkla 2D-kollisioner i planet. Detta är en del av ett pågående kursutvecklingsprojekt på V-programmet som syftar till att introducera digitalisering och programmering på V-programmet. Källkoden har utvecklats av **Joel Utsi och Linus Andersson**.
 
 Webbplatsen finns på: https://joelu2001.github.io/testing_linus_assignment/
 

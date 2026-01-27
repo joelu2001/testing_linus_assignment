@@ -66,13 +66,20 @@
             <input id="borderEnabled" type="checkbox" style="width:auto;" />
             Kant
           </label>
+          <label>
+            Dimension
+            <select id="dimensionMode" style="width:80px;background:#2a2a2a;color:#e0e0e0;border:1px solid #444;padding:8px;border-radius:6px;">
+              <option value="2D">2D</option>
+              <option value="1D">1D</option>
+            </select>
+          </label>
         </div>
         <div id="borderInputs" class="row" style="display:none;">
           <label>
             Bredd
             <input id="borderWidth" type="number" step="0.1" value="4.0" />
           </label>
-          <label>
+          <label id="borderHeightLabel">
             Höjd
             <input id="borderHeight" type="number" step="0.1" value="4.0" />
           </label>
@@ -83,11 +90,11 @@
         <h3>Puck</h3>
         <div class="row">
           <label>pos x <input id="px" class="small" type="number" step="0.1" value="-1.0"></label>
-          <label>pos y <input id="py" class="small" type="number" step="0.1" value="-1.0"></label>
+          <label id="pyLabel">pos y <input id="py" class="small" type="number" step="0.1" value="-1.0"></label>
           <label>radie <input id="pr" class="small" type="number" step="0.01" value="0.15"></label>
           <label>massa <input id="pm" class="small" type="number" step="0.01" value="1.0"></label>
           <label>vx <input id="pvx" class="small" type="number" step="0.1" value="2.0"></label>
-          <label>vy <input id="pvy" class="small" type="number" step="0.1" value="2.0"></label>
+          <label id="pvyLabel">vy <input id="pvy" class="small" type="number" step="0.1" value="2.0"></label>
 
           <button id="addPuckBtn">Lägg till puck</button>
         </div>
@@ -124,6 +131,10 @@
     const simAreaEl = document.getElementById("simArea");
     const borderEnabledEl = document.getElementById("borderEnabled");
     const borderInputsEl = document.getElementById("borderInputs");
+    const dimensionModeEl = document.getElementById("dimensionMode");
+    const pyLabelEl = document.getElementById("pyLabel");
+    const pvyLabelEl = document.getElementById("pvyLabel");
+    const borderHeightLabelEl = document.getElementById("borderHeightLabel");
 
     let pyodide = null;
     let pucks = [];
@@ -160,11 +171,12 @@
     }
 
     addPuckBtn.addEventListener("click", () => {
-      const x = readNum("px"), y = readNum("py"), radius = readNum("pr"),
+      const is1D = dimensionModeEl.value === "1D";
+      const x = readNum("px"), y = is1D ? 0 : readNum("py"), radius = readNum("pr"),
             mass = readNum("pm"),
-            vx = readNum("pvx"), vy = readNum("pvy");
+            vx = readNum("pvx"), vy = is1D ? 0 : readNum("pvy");
 
-      const vals = [x,y,radius,mass,vx,vy];
+      const vals = is1D ? [x,radius,mass,vx] : [x,y,radius,mass,vx,vy];
       if (vals.some(v => v === null)){
         statusEl.textContent = "Fyll i alla puck-fält med giltiga tal.";
         return;
@@ -530,6 +542,15 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
 
     borderEnabledEl.addEventListener("change", () => {
       borderInputsEl.style.display = borderEnabledEl.checked ? "flex" : "none";
+    });
+
+    dimensionModeEl.addEventListener("change", () => {
+      const is1D = dimensionModeEl.value === "1D";
+      pyLabelEl.style.display = is1D ? "none" : "flex";
+      pvyLabelEl.style.display = is1D ? "none" : "flex";
+      if (borderEnabledEl.checked) {
+        borderHeightLabelEl.style.display = is1D ? "none" : "flex";
+      }
     });
 
     let lastFreezeTimer = null;

@@ -16,6 +16,8 @@
     label {font-size:0.85rem;opacity:0.95;display:flex;flex-direction:column;gap:4px;}
     input {width:140px;box-sizing:border-box;background:#2a2a2a;color:#e0e0e0;border:1px solid #444;padding:8px;border-radius:6px;}
     input.small{width:110px;}
+    select {width:140px;box-sizing:border-box;background:#2a2a2a;color:#e0e0e0;border:1px solid #444;padding:8px;border-radius:6px;cursor:pointer;}
+    select:hover {border-color:#555;}
     button {padding:10px 14px;background:#333;color:#e0e0e0;border:1px solid #555;cursor:pointer;border-radius:8px;}
     button:hover {background:#444;}
     button:disabled{opacity:0.6;cursor:not-allowed;}
@@ -66,10 +68,12 @@
             <input id="borderEnabled" type="checkbox" style="width:auto;" />
             Kant
           </label>
-          <label style="flex-direction:row;align-items:center;gap:8px;">
-            <span style="font-size:0.85rem;opacity:0.95;">1D</span>
-            <input id="dimensionMode" type="checkbox" checked style="width:auto;" />
-            <span style="font-size:0.85rem;opacity:0.95;">2D</span>
+          <label>
+            Dimension
+            <select id="dimensionMode">
+              <option value="2D">2D</option>
+              <option value="1D">1D</option>
+            </select>
           </label>
         </div>
         <div id="borderInputs" class="row" style="display:none;">
@@ -169,7 +173,7 @@
     }
 
     addPuckBtn.addEventListener("click", () => {
-      const is1D = !dimensionModeEl.checked;
+      const is1D = dimensionModeEl.value === "1D";
       const x = readNum("px"), y = is1D ? 0 : readNum("py"), radius = readNum("pr"),
             mass = readNum("pm"),
             vx = readNum("pvx"), vy = is1D ? 0 : readNum("pvy");
@@ -543,7 +547,7 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
     });
 
     dimensionModeEl.addEventListener("change", () => {
-      const is1D = !dimensionModeEl.checked;
+      const is1D = dimensionModeEl.value === "1D";
       pyLabelEl.style.display = is1D ? "none" : "flex";
       pvyLabelEl.style.display = is1D ? "none" : "flex";
       if (borderEnabledEl.checked) {

@@ -86,7 +86,6 @@
       <div class="topbar">
         <h2 style="margin:0;">Simulation</h2>
         <div class="hint" id="simHint">Lägg till puckar och tryck på Simulera!</div>
-        <button id="stopBtn" disabled>Stoppa</button>
       </div>
 
       <div id="simArea">
@@ -101,7 +100,6 @@
   <script>
     const statusEl = document.getElementById("status");
     const simulateBtn = document.getElementById("simulateBtn");
-    const stopBtn = document.getElementById("stopBtn");
     const addPuckBtn = document.getElementById("addPuckBtn");
     const puckListEl = document.getElementById("puckList");
     const simHintEl = document.getElementById("simHint");
@@ -456,13 +454,6 @@ def simulate_to_media_base64(pucks_data, friction, cor, T):
       });
     });
 
-    stopBtn.addEventListener("click", () => {
-      simAreaEl.innerHTML = `<div class="hint">Inget att visa än.</div>`;
-      simHintEl.textContent = "Lägg till puckar och tryck på Simulera!";
-      statusEl.textContent = "Redo.";
-      stopBtn.disabled = true;
-    });
-
     let lastFreezeTimer = null;
     let simRunId = 0;
 
@@ -532,7 +523,6 @@ def simulate_to_media_base64(pucks_data, friction, cor, T):
       statusEl.textContent = "Klar.";
       simHintEl.textContent = "Tryck Simulera! för ny simulering.";
       simulateBtn.disabled = false;
-      stopBtn.disabled = false;
     }
 
     renderPuckList();

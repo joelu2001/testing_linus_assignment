@@ -61,6 +61,22 @@
             <input id="T" type="number" step="0.1" value="5.0" />
           </label>
         </div>
+        <div class="row">
+          <label style="flex-direction:row;align-items:center;gap:6px;">
+            <input id="borderEnabled" type="checkbox" style="width:auto;" />
+            Kant
+          </label>
+        </div>
+        <div id="borderInputs" class="row" style="display:none;">
+          <label>
+            Bredd
+            <input id="borderWidth" type="number" step="0.1" value="4.0" />
+          </label>
+          <label>
+            Höjd
+            <input id="borderHeight" type="number" step="0.1" value="4.0" />
+          </label>
+        </div>
       </div>
 
       <div class="card">
@@ -106,6 +122,8 @@
     const puckListEl = document.getElementById("puckList");
     const simHintEl = document.getElementById("simHint");
     const simAreaEl = document.getElementById("simArea");
+    const borderEnabledEl = document.getElementById("borderEnabled");
+    const borderInputsEl = document.getElementById("borderInputs");
 
     let pyodide = null;
     let pucks = [];
@@ -209,6 +227,10 @@ class Room:
         self.friction = float(friction)
         self.cor = float(cor)
         self.pucks = []
+        self.border = None
+
+    def set_border(self, width, height):
+        self.border = {"width": float(width), "height": float(height)}
 
     def add(self, puck):
         self.pucks.append(puck)
@@ -216,7 +238,6 @@ class Room:
     def update_step(self, dt):
         length = len(self.pucks)
 
-        # collisions
         for i in range(length):
             for j in range(i + 1, length):
                 p1, p2 = self.pucks[i], self.pucks[j]
@@ -225,7 +246,6 @@ class Room:
                     p1.set_velocity(*v1_after)
                     p2.set_velocity(*v2_after)
 
-                    # separate overlap
                     n = self.collision_normal(p1, p2)
                     d = self.distance(p1, p2)
                     collision_radius = p1.get_radius() + p2.get_radius()
@@ -234,7 +254,10 @@ class Room:
                     p1.set_position(self._sum(p1.get_pos(), self._mult_scalar(extra_margin, n)))
                     p2.set_position(self._sum(p2.get_pos(), self._mult_scalar(-extra_margin, n)))
 
-        # integrate
+        if self.border:
+            for puck in self.pucks:
+                self._handle_border_collision(puck)
+
         for puck in self.pucks:
             vx, vy = puck.get_velocity()
             x, y = puck.get_pos()
@@ -246,6 +269,31 @@ class Room:
 
             puck.set_position(new_pos)
             puck.set_velocity(*new_v)
+
+    def _handle_border_collision(self, puck):
+        x, y = puck.get_pos()
+        vx, vy = puck.get_velocity()
+        r = puck.get_radius()
+        w = self.border["width"] / 2.0
+        h = self.border["height"] / 2.0
+        e = self.cor
+
+        if x - r < -w:
+            puck.set_position((-w + r, y))
+            puck.set_velocity(-vx * e, vy)
+        elif x + r > w:
+            puck.set_position((w - r, y))
+            puck.set_velocity(-vx * e, vy)
+
+        x, y = puck.get_pos()
+        vx, vy = puck.get_velocity()
+
+        if y - r < -h:
+            puck.set_position((x, -h + r))
+            puck.set_velocity(vx, -vy * e)
+        elif y + r > h:
+            puck.set_position((x, h - r))
+            puck.set_velocity(vx, -vy * e)
 
     def collision_velocities(self, p1, p2):
         m1, m2 = p1.get_mass(), p2.get_mass()
@@ -299,7 +347,7 @@ class Room:
 DT = 0.002
 FPS = 24
 
-def simulate_to_media_base64(pucks_data, friction, cor, T):
+def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, border_width, border_height):
     dt = DT
     fps = FPS
     T = float(T)
@@ -307,6 +355,8 @@ def simulate_to_media_base64(pucks_data, friction, cor, T):
     cor = float(cor)
 
     room = Room(friction, cor)
+    if border_enabled:
+        room.set_border(border_width, border_height)
     pucks = []
     for p in pucks_data:
         puck = Puck(
@@ -340,6 +390,13 @@ def simulate_to_media_base64(pucks_data, friction, cor, T):
             r = radii[i]
             xmin = min(xmin, x - r); xmax = max(xmax, x + r)
             ymin = min(ymin, y - r); ymax = max(ymax, y + r)
+    
+    if border_enabled:
+        bw = float(border_width) / 2.0
+        bh = float(border_height) / 2.0
+        xmin = min(xmin, -bw); xmax = max(xmax, bw)
+        ymin = min(ymin, -bh); ymax = max(ymax, bh)
+    
     span = max(xmax - xmin, ymax - ymin, 1.0)
     pad = 0.12 * span
     xmin -= pad; xmax += pad; ymin -= pad; ymax += pad
@@ -356,6 +413,14 @@ def simulate_to_media_base64(pucks_data, friction, cor, T):
     ax.set_xticks([]); ax.set_yticks([])
     for sp in ax.spines.values():
         sp.set_visible(False)
+
+    if border_enabled:
+        from matplotlib.patches import Rectangle
+        bw = float(border_width) / 2.0
+        bh = float(border_height) / 2.0
+        border_rect = Rectangle((-bw, -bh), border_width, border_height, 
+                                fill=False, linewidth=1.8, edgecolor="#888888", alpha=0.7)
+        ax.add_patch(border_rect)
 
     circles = []
     for i in range(len(pucks)):
@@ -463,6 +528,10 @@ def simulate_to_media_base64(pucks_data, friction, cor, T):
       stopBtn.disabled = true;
     });
 
+    borderEnabledEl.addEventListener("change", () => {
+      borderInputsEl.style.display = borderEnabledEl.checked ? "flex" : "none";
+    });
+
     let lastFreezeTimer = null;
     let simRunId = 0;
 
@@ -476,9 +545,20 @@ def simulate_to_media_base64(pucks_data, friction, cor, T):
       const friction = readNum("friction");
       const cor = readNum("cor");
       const T = readNum("T");
+      const borderEnabled = borderEnabledEl.checked;
+      const borderWidth = borderEnabled ? readNum("borderWidth") : null;
+      const borderHeight = borderEnabled ? readNum("borderHeight") : null;
 
       if ([friction, cor, T].some(v => v === null)){
         statusEl.textContent = "Fyll i friction/e/T med giltiga tal.";
+        return;
+      }
+      if (borderEnabled && (borderWidth === null || borderHeight === null)){
+        statusEl.textContent = "Fyll i kant bredd och höjd.";
+        return;
+      }
+      if (borderEnabled && (borderWidth <= 0 || borderHeight <= 0)){
+        statusEl.textContent = "Kant bredd och höjd måste vara > 0.";
         return;
       }
       if (friction < 0){
@@ -512,9 +592,12 @@ def simulate_to_media_base64(pucks_data, friction, cor, T):
       pyodide.globals.set("friction_js", friction);
       pyodide.globals.set("cor_js", cor);
       pyodide.globals.set("T_js", T);
+      pyodide.globals.set("border_enabled_js", borderEnabled);
+      pyodide.globals.set("border_width_js", borderWidth || 0);
+      pyodide.globals.set("border_height_js", borderHeight || 0);
 
       const pyRes = await pyodide.runPythonAsync(
-        "simulate_to_media_base64(pucks_js, friction_js, cor_js, T_js)"
+        "simulate_to_media_base64(pucks_js, friction_js, cor_js, T_js, border_enabled_js, border_width_js, border_height_js)"
       );
 
       if (runId !== simRunId) {

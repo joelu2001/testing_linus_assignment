@@ -242,9 +242,13 @@ class Room:
         self.cor = float(cor)
         self.pucks = []
         self.border = None
+        self.is_1d = False
 
     def set_border(self, width, height):
         self.border = {"width": float(width), "height": float(height)}
+
+    def set_1d_mode(self, is_1d):
+        self.is_1d = is_1d
 
     def add(self, puck):
         self.pucks.append(puck)
@@ -296,7 +300,6 @@ class Room:
         vx, vy = puck.get_velocity()
         r = puck.get_radius()
         w = self.border["width"] / 2.0
-        h = self.border["height"] / 2.0
         e = self.cor
 
         if x - r < -w:
@@ -306,15 +309,17 @@ class Room:
             puck.set_position((w - r, y))
             puck.set_velocity(-vx * e, vy)
 
-        x, y = puck.get_pos()
-        vx, vy = puck.get_velocity()
+        if not self.is_1d:
+            x, y = puck.get_pos()
+            vx, vy = puck.get_velocity()
+            h = self.border["height"] / 2.0
 
-        if y - r < -h:
-            puck.set_position((x, -h + r))
-            puck.set_velocity(vx, -vy * e)
-        elif y + r > h:
-            puck.set_position((x, h - r))
-            puck.set_velocity(vx, -vy * e)
+            if y - r < -h:
+                puck.set_position((x, -h + r))
+                puck.set_velocity(vx, -vy * e)
+            elif y + r > h:
+                puck.set_position((x, h - r))
+                puck.set_velocity(vx, -vy * e)
 
     def collision_velocities(self, p1, p2):
         m1, m2 = p1.get_mass(), p2.get_mass()
@@ -368,7 +373,7 @@ class Room:
 DT = 0.002
 FPS = 24
 
-def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, border_width, border_height):
+def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, border_width, border_height, is_1d):
     dt = DT
     fps = FPS
     T = float(T)
@@ -376,6 +381,7 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
     cor = float(cor)
 
     room = Room(friction, cor)
+    room.set_1d_mode(is_1d)
     if border_enabled:
         room.set_border(border_width, border_height)
     pucks = []
@@ -436,12 +442,16 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
         sp.set_visible(False)
 
     if border_enabled:
-        from matplotlib.patches import Rectangle
         bw = float(border_width) / 2.0
-        bh = float(border_height) / 2.0
-        border_rect = Rectangle((-bw, -bh), border_width, border_height, 
-                                fill=False, linewidth=1.8, edgecolor="#888888", alpha=0.7)
-        ax.add_patch(border_rect)
+        if is_1d:
+            ax.axvline(x=-bw, color="#888888", linewidth=1.8, alpha=0.7)
+            ax.axvline(x=bw, color="#888888", linewidth=1.8, alpha=0.7)
+        else:
+            from matplotlib.patches import Rectangle
+            bh = float(border_height) / 2.0
+            border_rect = Rectangle((-bw, -bh), border_width, border_height, 
+                                    fill=False, linewidth=1.8, edgecolor="#888888", alpha=0.7)
+            ax.add_patch(border_rect)
 
     circles = []
     for i in range(len(pucks)):
@@ -560,6 +570,14 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
       if (borderEnabledEl.checked) {
         borderHeightLabelEl.style.display = is1D ? "none" : "flex";
       }
+      
+      if (is1D) {
+        pucks.forEach(p => {
+          p.y = 0;
+          p.vy = 0;
+        });
+        renderPuckList();
+      }
     });
 
     let lastFreezeTimer = null;
@@ -625,9 +643,10 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
       pyodide.globals.set("border_enabled_js", borderEnabled);
       pyodide.globals.set("border_width_js", borderWidth || 0);
       pyodide.globals.set("border_height_js", borderHeight || 0);
+      pyodide.globals.set("is_1d_js", dimensionModeEl.value === "1D");
 
       const pyRes = await pyodide.runPythonAsync(
-        "simulate_to_media_base64(pucks_js, friction_js, cor_js, T_js, border_enabled_js, border_width_js, border_height_js)"
+        "simulate_to_media_base64(pucks_js, friction_js, cor_js, T_js, border_enabled_js, border_width_js, border_height_js, is_1d_js)"
       );
 
       if (runId !== simRunId) {

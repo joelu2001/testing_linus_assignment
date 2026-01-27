@@ -117,6 +117,8 @@
       <div id="simArea">
         <div class="hint">Inget att visa än.</div>
       </div>
+      
+      <div id="simInfo" style="display:none;background:#181818;border:1px solid #333;border-radius:8px;padding:10px;font-family:monospace;font-size:0.85rem;"></div>
     </div>
   </div>
 
@@ -131,6 +133,7 @@
     const puckListEl = document.getElementById("puckList");
     const simHintEl = document.getElementById("simHint");
     const simAreaEl = document.getElementById("simArea");
+    const simInfoEl = document.getElementById("simInfo");
     const borderEnabledEl = document.getElementById("borderEnabled");
     const borderInputsEl = document.getElementById("borderInputs");
     const dimensionModeEl = document.getElementById("dimensionMode");
@@ -473,42 +476,21 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
         )
         texts.append(t)
 
-    hud = ax.text(
-        0.5, -0.15, "",
-        transform=ax.transAxes,
-        va="top", ha="center",
-        fontsize=7,
-        color="#eaeaea",
-        family="monospace",
-        bbox=dict(
-            boxstyle="round,pad=0.35",
-            facecolor=(0,0,0,0.5),
-            edgecolor=(1,1,1,0.15)
-        )
-    )
-
     def init():
         if len(frames_pos) > 0:
             for i, (x, y) in enumerate(frames_pos[0]):
                 circles[i].center = (x, y)
                 texts[i].set_position((x, y + radii[i] + label_offset))
-        hud.set_text("")
-        return circles + texts + [hud]
+        return circles + texts
 
     def update(frame_idx):
         pos = frames_pos[frame_idx]
-        vel = frames_vel[frame_idx]
 
         for i, (x, y) in enumerate(pos):
             circles[i].center = (x, y)
             texts[i].set_position((x, y + radii[i] + label_offset))
 
-        lines = []
-        for i, ((x, y), (vx, vy)) in enumerate(zip(pos, vel), start=1):
-            lines.append(f"P{i}: x={x:+.2f} y={y:+.2f}  vx={vx:+.2f} vy={vy:+.2f}")
-
-        hud.set_text("\\n".join(lines))
-        return circles + texts + [hud]
+        return circles + texts
 
     anim = FuncAnimation(
         fig,
@@ -533,11 +515,20 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
         pass
 
     duration_ms = int(len(frames_pos) * (1000 / fps))
+    
+    frames_data = []
+    for pos, vel in zip(frames_pos, frames_vel):
+        frame_info = []
+        for i, ((x, y), (vx, vy)) in enumerate(zip(pos, vel), start=1):
+            frame_info.append({"id": i, "x": x, "y": y, "vx": vx, "vy": vy})
+        frames_data.append(frame_info)
 
     return {
         "gif_b64": base64.b64encode(gif_bytes).decode("utf-8"),
         "last_png_b64": "",
-        "duration_ms": duration_ms
+        "duration_ms": duration_ms,
+        "frames_data": frames_data,
+        "fps": fps
     }
       `);
 
@@ -557,6 +548,11 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
       simHintEl.textContent = "Lägg till partiklar och tryck på Simulera!";
       statusEl.textContent = "Redo.";
       stopBtn.disabled = true;
+      simInfoEl.style.display = "none";
+      if (window.simInfoInterval) {
+        clearInterval(window.simInfoInterval);
+        window.simInfoInterval = null;
+      }
     });
 
     borderEnabledEl.addEventListener("change", () => {
@@ -658,8 +654,32 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
       try { pyRes.destroy(); } catch(e) {}
 
       const gifB64 = res.gif_b64;
+      const framesData = res.frames_data;
+      const fps = res.fps;
 
       simAreaEl.innerHTML = `<img id="simImg" alt="Simulation GIF" src="data:image/gif;base64,${gifB64}">`;
+      
+      simInfoEl.style.display = "block";
+      
+      let currentFrame = 0;
+      const updateInfo = () => {
+        if (currentFrame < framesData.length) {
+          const frame = framesData[currentFrame];
+          const lines = frame.map(p => 
+            `P${p.id}: x=${p.x.toFixed(2).padStart(6)} y=${p.y.toFixed(2).padStart(6)}  vx=${p.vx.toFixed(2).padStart(6)} vy=${p.vy.toFixed(2).padStart(6)}`
+          );
+          simInfoEl.innerHTML = lines.join('<br>');
+          currentFrame = (currentFrame + 1) % framesData.length;
+        }
+      };
+      
+      updateInfo();
+      const infoInterval = setInterval(updateInfo, 1000 / fps);
+      
+      if (window.simInfoInterval) {
+        clearInterval(window.simInfoInterval);
+      }
+      window.simInfoInterval = infoInterval;
 
       statusEl.textContent = "Klar.";
       simHintEl.textContent = "Tryck Simulera! för ny simulering.";

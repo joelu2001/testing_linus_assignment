@@ -268,21 +268,28 @@ class Room:
                     p1.set_position(self._sum(p1.get_pos(), self._mult_scalar(extra_margin, n)))
                     p2.set_position(self._sum(p2.get_pos(), self._mult_scalar(-extra_margin, n)))
 
+        for puck in self.pucks:
+            vx, vy = puck.get_velocity()
+            x, y = puck.get_pos()
+            new_pos = (x + dt * vx, y + dt * vy)
+            puck.set_position(new_pos)
+
         if self.border:
             for puck in self.pucks:
                 self._handle_border_collision(puck)
 
         for puck in self.pucks:
             vx, vy = puck.get_velocity()
-            x, y = puck.get_pos()
-
-            new_pos = (x + dt * vx, y + dt * vy)
-
             ax, ay = self._deceleration(puck)
-            new_v = (vx - dt * ax, vy - dt * ay)
-
-            puck.set_position(new_pos)
-            puck.set_velocity(*new_v)
+            new_vx = vx - dt * ax
+            new_vy = vy - dt * ay
+            
+            if vx * new_vx < 0:
+                new_vx = 0.0
+            if vy * new_vy < 0:
+                new_vy = 0.0
+            
+            puck.set_velocity(new_vx, new_vy)
 
     def _handle_border_collision(self, puck):
         x, y = puck.get_pos()

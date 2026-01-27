@@ -38,7 +38,7 @@
   <div class="wrap">
     <div class="left">
       <div class="author-note">Utvecklat av Joel Utsi & Linus Andersson</div>
-      <h2>Puckdata</h2>
+      <h2>Partikeldata</h2>
 
       <div class="row">
         <button id="simulateBtn" disabled>Simulera!</button>
@@ -89,7 +89,7 @@
       </div>
 
       <div class="card">
-        <h3>Puck</h3>
+        <h3>Partikel</h3>
         <div class="row">
           <label>pos x <input id="px" class="small" type="number" step="0.1" value="-1.0"></label>
           <label id="pyLabel">pos y <input id="py" class="small" type="number" step="0.1" value="-1.0"></label>
@@ -98,11 +98,11 @@
           <label>vx <input id="pvx" class="small" type="number" step="0.1" value="2.0"></label>
           <label id="pvyLabel">vy <input id="pvy" class="small" type="number" step="0.1" value="2.0"></label>
 
-          <button id="addPuckBtn">Lägg till puck</button>
+          <button id="addPuckBtn">Lägg till partikel</button>
         </div>
-        <div class="hint">Lägger till puck med position, radie, massa, och begynnelsehastighet.</div>
+        <div class="hint">Lägger till partikel med position, radie, massa, och begynnelsehastighet.</div>
 
-        <h3 style="margin-top:12px;">Puckar</h3>
+        <h3 style="margin-top:12px;">Partiklar</h3>
         <div id="puckList" class="puck-list"></div>
       </div>
     </div>
@@ -150,7 +150,7 @@
     function renderPuckList(){
       puckListEl.innerHTML = "";
       if (pucks.length === 0){
-        puckListEl.innerHTML = `<div class="hint">Inga puckar än.</div>`;
+        puckListEl.innerHTML = `<div class="hint">Inga partiklar än.</div>`;
         return;
       }
       pucks.forEach((p, idx) => {
@@ -180,7 +180,7 @@
 
       const vals = is1D ? [x,radius,mass,vx] : [x,y,radius,mass,vx,vy];
       if (vals.some(v => v === null)){
-        statusEl.textContent = "Fyll i alla puck-fält med giltiga tal.";
+        statusEl.textContent = "Fyll i alla partikelfält med giltiga tal.";
         return;
       }
       if (radius <= 0 || mass <= 0){
@@ -190,7 +190,7 @@
 
       pucks.push({x,y,radius,mass,vx,vy});
       renderPuckList();
-      statusEl.textContent = "Puck tillagd.";
+      statusEl.textContent = "Partikel tillagd.";
     });
 
     async function initPyodideAndPackages(){
@@ -544,7 +544,7 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
 
     stopBtn.addEventListener("click", () => {
       simAreaEl.innerHTML = `<div class="hint">Inget att visa än.</div>`;
-      simHintEl.textContent = "Lägg till puckar och tryck på Simulera!";
+      simHintEl.textContent = "Lägg till partiklar och tryck på Simulera!";
       statusEl.textContent = "Redo.";
       stopBtn.disabled = true;
     });
@@ -568,7 +568,7 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
     async function doSimulate(){
       if (!pyodide) return;
       if (pucks.length === 0){
-        statusEl.textContent = "Lägg till åtminstone en puck.";
+        statusEl.textContent = "Lägg till åtminstone en partikel.";
         return;
       }
 

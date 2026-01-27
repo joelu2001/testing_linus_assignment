@@ -436,6 +436,8 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
     bg = "#0f1115"
     fig.patch.set_facecolor(bg)
     ax.set_facecolor(bg)
+    
+    fig.tight_layout(pad=0)
 
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)

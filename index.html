@@ -66,12 +66,10 @@
             <input id="borderEnabled" type="checkbox" style="width:auto;" />
             Kant
           </label>
-          <label>
-            Dimension
-            <select id="dimensionMode" style="width:80px;background:#2a2a2a;color:#e0e0e0;border:1px solid #444;padding:8px;border-radius:6px;">
-              <option value="2D">2D</option>
-              <option value="1D">1D</option>
-            </select>
+          <label style="flex-direction:row;align-items:center;gap:8px;">
+            <span style="font-size:0.85rem;opacity:0.95;">1D</span>
+            <input id="dimensionMode" type="checkbox" checked style="width:auto;" />
+            <span style="font-size:0.85rem;opacity:0.95;">2D</span>
           </label>
         </div>
         <div id="borderInputs" class="row" style="display:none;">
@@ -171,7 +169,7 @@
     }
 
     addPuckBtn.addEventListener("click", () => {
-      const is1D = dimensionModeEl.value === "1D";
+      const is1D = !dimensionModeEl.checked;
       const x = readNum("px"), y = is1D ? 0 : readNum("py"), radius = readNum("pr"),
             mass = readNum("pm"),
             vx = readNum("pvx"), vy = is1D ? 0 : readNum("pvy");
@@ -545,7 +543,7 @@ def simulate_to_media_base64(pucks_data, friction, cor, T, border_enabled, borde
     });
 
     dimensionModeEl.addEventListener("change", () => {
-      const is1D = dimensionModeEl.value === "1D";
+      const is1D = !dimensionModeEl.checked;
       pyLabelEl.style.display = is1D ? "none" : "flex";
       pvyLabelEl.style.display = is1D ? "none" : "flex";
       if (borderEnabledEl.checked) {
